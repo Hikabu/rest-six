@@ -42,7 +42,15 @@ export class GithubAdapterService {
 
     try {
       const token = this.decryptToken(profile.encryptedToken);
-      const rawData = await this.fetchRawData(profile.githubUsername, token);
+      const octokit = new Octokit({
+        auth: token,
+        request: {
+          headers: {
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        },
+      });
+      const rawData = await this.fetchRawData(octokit, profile.githubUsername);
 
       await this.prisma.githubProfile.update({
         where: { id: githubProfileId },
@@ -69,34 +77,32 @@ export class GithubAdapterService {
    * Fetches the minimal audited data required for scoring.
    */
   async fetchRawData(
+    octokit: Octokit,
     githubUsername: string,
-    token: string,
+    jobId?: string,
   ): Promise<GitHubRawData> {
     return this.withCache(`github:v2:raw:${githubUsername}`, async () => {
-    //   const octokit = new Octokit({ auth: token });
-
-const octokit = new Octokit({
-  auth: token,
-  request: {
-    headers: {
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  },
-});
       // 1. Fetch Profile
-      const profileData = await this.fetchProfile(octokit, githubUsername);
+      const profileData = await this.fetchProfile(octokit, githubUsername, jobId);
 
       // 2. Fetch Repos (limited to MAX_REPOS)
-      const repos = await this.fetchRepos(octokit, githubUsername);
+      const repos = await this.fetchRepos(octokit, githubUsername, jobId);
 
       const manifestKeys = await this.fetchManifests(
         octokit,
         githubUsername,
         repos,
+        jobId,
       );
 
-      // 3. Fetch GraphQL data (Contributions & External PRs)
-      const { contributions, externalPRs } = await this.fetchGraphQLData(
+      // 3. Fetch GraphQL data (Contributions)
+      const contributions = await this.fetchGraphQLData(
+        octokit,
+        githubUsername,
+      );
+
+      // 4. Fetch External PRs (Search API with retry)
+      const externalPRs = await this.fetchExternalPRs(
         octokit,
         githubUsername,
       );
@@ -115,10 +121,12 @@ const octokit = new Octokit({
   private async fetchProfile(
     octokit: Octokit,
     username: string,
+    jobId?: string,
   ): Promise<GitHubUserProfile> {
     const res = await this.withRetry(() =>
       octokit.rest.users.getByUsername({ username }),
     );
+    this.logRateLimit(res, 'users.getByUsername', jobId);
     const data = res.data;
 
     const accountCreatedAt = new Date(data.created_at);
@@ -138,6 +146,7 @@ const octokit = new Octokit({
   private async fetchRepos(
     octokit: Octokit,
     username: string,
+    jobId?: string,
   ): Promise<GitHubRepo[]> {
     const res = await this.withRetry(() =>
       octokit.rest.repos.listForUser({
@@ -149,6 +158,7 @@ const octokit = new Octokit({
         },
       }),
     );
+    this.logRateLimit(res, 'repos.listForUser', jobId);
 
     const rawRepos = res.data as any[];
     return rawRepos.slice(0, MAX_REPOS).map((r) => ({
@@ -167,10 +177,7 @@ const octokit = new Octokit({
   private async fetchGraphQLData(
     octokit: Octokit,
     username: string,
-  ): Promise<{
-    contributions: GitHubContributionData;
-    externalPRs: GitHubExternalPRData;
-  }> {
+  ): Promise<GitHubContributionData> {
     const query = `
       query($login: String!) {
         user(login: $login) {
@@ -180,14 +187,6 @@ const octokit = new Octokit({
                 contributionDays {
                   contributionCount
                 }
-              }
-            }
-          }
-          pullRequests(states: MERGED, first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
-            nodes {
-              repository {
-                name
-                owner { login }
               }
             }
           }
@@ -222,23 +221,76 @@ const octokit = new Octokit({
 
     const activeWeeksCount = weeklyTotals.filter((total) => total > 0).length;
 
-    // Process External PRs
-    const externalPRs = user.pullRequests.nodes.filter(
-      (pr: any) =>
-        pr.repository.owner.login.toLowerCase() !== username.toLowerCase(),
-    );
+    return {
+      weeklyTotals,
+      activeWeeksCount,
+    };
+  }
+
+  private async fetchExternalPRsFromApi(
+    octokit: Octokit,
+    username: string
+  ): Promise<{ repo: string; merged: boolean }[]> {
+    const MAX_RETRIES = 2;
+    let attempt = 0;
+
+    while (attempt <= MAX_RETRIES) {
+      try {
+        const result = await octokit.rest.search.issuesAndPullRequests({
+          q: `type:pr author:${username} is:merged -user:${username}`,
+          per_page: 50,
+          sort: 'created',
+          order: 'desc'
+        });
+        return result.data.items.map(pr => ({
+          repo: pr.repository_url.replace('https://api.github.com/repos/', ''),
+          merged: true
+        }));
+      } catch (err: any) {
+        if (err.status === 403 && err.response?.headers?.['x-ratelimit-remaining'] === '0') {
+          // Search API rate limit specifically
+          const resetMs = Number(err.response.headers['x-ratelimit-reset']) * 1000;
+          const waitMs  = Math.min(resetMs - Date.now() + 1000, 65000); // max 65s wait
+
+          this.logger.warn({
+            username,
+            waitMs,
+            attempt
+          }, 'github_search_rate_limited');
+
+          if (attempt < MAX_RETRIES) {
+            await new Promise(resolve => setTimeout(resolve, waitMs));
+            attempt++;
+            continue;
+          }
+        }
+        // Non-rate-limit error OR retries exhausted:
+        // Return empty array — external PRs are signal, not required
+        this.logger.warn({ username, err: err.status }, 'external_pr_fetch_failed');
+        return [];
+      }
+    }
+    return [];
+  }
+
+  private async fetchExternalPRs(
+    octokit: Octokit,
+    username: string,
+  ): Promise<GitHubExternalPRData> {
+    const prCacheKey = `github:prs:${username}`;
+    let prs: { repo: string; merged: boolean }[] = [];
+    
+    const cached = await this.redis.get(prCacheKey);
+    if (cached) {
+      prs = JSON.parse(cached);
+    } else {
+      prs = await this.fetchExternalPRsFromApi(octokit, username);
+      await this.redis.set(prCacheKey, JSON.stringify(prs), 'EX', 1800);
+    }
 
     return {
-      contributions: {
-        weeklyTotals,
-        activeWeeksCount,
-      },
-      externalPRs: {
-        mergedExternalPRCount: externalPRs.length,
-        externalRepoNames: Array.from(
-          new Set(externalPRs.map((pr: any) => pr.repository.name)),
-        ),
-      },
+      mergedExternalPRCount: prs.length,
+      externalRepoNames: Array.from(new Set(prs.map((pr) => pr.repo))),
     };
   }
 
@@ -298,96 +350,167 @@ const octokit = new Octokit({
     }
   }
 
+  private parsePackageJsonKeys(content: string): string[] {
+    try {
+      const parsed = JSON.parse(content);
+      return Object.keys(parsed.dependencies || {}).concat(
+        Object.keys(parsed.devDependencies || {}),
+      );
+    } catch (e) {
+      return [];
+    }
+  }
+
+  private parseCargoTomlKeys(content: string): string[] {
+    const depKeys: string[] = [];
+    const lines = content.split('\n');
+    let inDependencies = false;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      if (trimmed.startsWith('[')) {
+        if (
+          trimmed === '[dependencies]' ||
+          trimmed === '[dev-dependencies]' ||
+          trimmed === '[build-dependencies]'
+        ) {
+          inDependencies = true;
+        } else {
+          inDependencies = false;
+        }
+        continue;
+      }
+
+      if (inDependencies) {
+        const parts = trimmed.split('=');
+        if (parts.length >= 2) {
+          depKeys.push(parts[0].trim());
+        }
+      }
+    }
+    return depKeys;
+  }
+
+  private async fetchManifest(
+    octokit: Octokit,
+    owner: string,
+    repo: string,
+    filename: 'package.json' | 'Cargo.toml',
+    jobId?: string,
+  ): Promise<string[] | null> {
+    const cacheKey = `github:manifest:${owner}:${repo}:${filename}`;
+
+    try {
+      const cached = await this.redis.get(cacheKey);
+      if (cached !== null) {
+        const parsed = JSON.parse(cached);
+        return parsed.length === 0 ? null : parsed;
+      }
+    } catch {}
+
+    try {
+      const response = await octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path: filename,
+      });
+      this.logRateLimit(response, `repos.getContent:${filename}`, jobId);
+
+      if (
+        !Array.isArray(response.data) &&
+        response.data.type === 'file' &&
+        response.data.content
+      ) {
+        const contentStr = Buffer.from(
+          response.data.content,
+          'base64',
+        ).toString('utf8');
+        
+        const depKeys = filename === 'package.json'
+          ? this.parsePackageJsonKeys(contentStr)
+          : this.parseCargoTomlKeys(contentStr);
+
+        await this.redis.set(cacheKey, JSON.stringify(depKeys), 'EX', 172800);
+        return depKeys;
+      }
+      return null;
+    } catch (err: any) {
+      if (err.status === 404) {
+        await this.redis.set(cacheKey, JSON.stringify([]), 'EX', 21600);
+        return null;
+      }
+      throw err;
+    }
+  }
+
   private async fetchManifests(
     octokit: Octokit,
     username: string,
     repos: GitHubRepo[],
+    jobId?: string,
   ): Promise<Record<string, string[]>> {
     const manifestKeys: Record<string, string[]> = {};
-    const nonForkOwnedRepos = repos.filter((r) => !r.isFork).slice(0, 20);
+    const reposToScan = repos
+      .filter((r) => !r.isFork)
+      .sort((a, b) => b.stars - a.stars)
+      .slice(0, 10);
 
-    for (const repo of nonForkOwnedRepos) {
-      const depKeys: string[] = [];
-
-      // 1. Try package.json
+    for (const repo of reposToScan) {
       try {
-        const pkgRes = await octokit.rest.repos.getContent({
-          owner: username,
-          repo: repo.name,
-          path: 'package.json',
-        });
-
-        if (
-          !Array.isArray(pkgRes.data) &&
-          pkgRes.data.type === 'file' &&
-          pkgRes.data.content
-        ) {
-          const contentStr = Buffer.from(
-            pkgRes.data.content,
-            'base64',
-          ).toString('utf8');
-          const parsed = JSON.parse(contentStr);
-          const pkgDeps = Object.keys(parsed.dependencies || {}).concat(
-            Object.keys(parsed.devDependencies || {}),
-          );
-          depKeys.push(...pkgDeps);
+        const pkgKeys = await this.fetchManifest(octokit, username, repo.name, 'package.json', jobId);
+        const cargoKeys = await this.fetchManifest(octokit, username, repo.name, 'Cargo.toml', jobId);
+        
+        if (pkgKeys) {
+          manifestKeys[repo.name] = [...(manifestKeys[repo.name] ?? []), ...pkgKeys];
         }
-      } catch (e) {
-        // Skip silently on 404 or parse error
-      }
-
-      // 2. Try Cargo.toml
-      try {
-        const cargoRes = await octokit.rest.repos.getContent({
-          owner: username,
-          repo: repo.name,
-          path: 'Cargo.toml',
-        });
-
-        if (
-          !Array.isArray(cargoRes.data) &&
-          cargoRes.data.type === 'file' &&
-          cargoRes.data.content
-        ) {
-          const contentStr = Buffer.from(
-            cargoRes.data.content,
-            'base64',
-          ).toString('utf8');
-          const lines = contentStr.split('\n');
-          let inDependencies = false;
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith('#')) continue;
-
-            if (trimmed.startsWith('[')) {
-              if (
-                trimmed === '[dependencies]' ||
-                trimmed === '[dev-dependencies]' ||
-                trimmed === '[build-dependencies]'
-              ) {
-                inDependencies = true;
-              } else {
-                inDependencies = false;
-              }
-              continue;
-            }
-
-            if (inDependencies) {
-              const parts = trimmed.split('=');
-              if (parts.length >= 2) {
-                depKeys.push(parts[0].trim());
-              }
-            }
-          }
+        if (cargoKeys) {
+          manifestKeys[repo.name] = [...(manifestKeys[repo.name] ?? []), ...cargoKeys];
         }
-      } catch (e) {
-        // Skip silently on 404 or parse error
+      } catch (err: any) {
+        if (err.status === 403 || err.status === 429) {
+          this.logger.warn({ repo: repo.name }, 'manifest_fetch_rate_limited_stopping');
+          break;
+        }
+        this.logger.debug({ repo: repo.name, err: err.status }, 'manifest_fetch_skipped');
       }
-
-      manifestKeys[repo.name] = depKeys;
     }
 
     return manifestKeys;
+  }
+
+  async getRateLimitRemaining(octokit: Octokit): Promise<number> {
+    const r = await octokit.rest.rateLimit.get();
+    return r.data.rate.remaining;
+  }
+
+  private logRateLimit(response: any, endpoint: string, jobId?: string) {
+    if (!response || !response.headers) return;
+    const remaining = response.headers['x-ratelimit-remaining'];
+    const limit     = response.headers['x-ratelimit-limit'];
+    const reset     = response.headers['x-ratelimit-reset'];
+    const tokenHint = response.headers['x-oauth-scopes']
+      ? 'oauth-token'
+      : response.headers['x-ratelimit-limit'] === '60'
+        ? 'unauthenticated'
+        : 'pat-or-system-token';
+
+    this.logger.debug({
+      endpoint,
+      remaining: Number(remaining),
+      limit:     Number(limit),
+      resetAt:   new Date(Number(reset) * 1000).toISOString(),
+      tokenType: tokenHint,
+      jobId
+    }, 'github_api_call');
+
+    if (Number(remaining) < 100) {
+      this.logger.warn({
+        remaining: Number(remaining),
+        resetAt:   new Date(Number(reset) * 1000).toISOString(),
+        jobId
+      }, 'github_rate_limit_low');
+    }
   }
 }

@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { Octokit } from 'octokit';
 import { AppModule } from '../app.module';
 import { GithubAdapterService } from '../modules/scoring/github-adapter/github-adapter.service';
 import { ScoringService } from '../modules/scoring/scoring-service/scoring.service';
@@ -26,6 +27,15 @@ async function bootstrap() {
     process.exit(1);
   }
 
+  const octokit = new Octokit({
+    auth: token,
+    request: {
+      headers: {
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    },
+  });
+
   logger.log(
     `Starting cache preload for ${SEED_DEVELOPERS.length} developers...`,
   );
@@ -35,7 +45,7 @@ async function bootstrap() {
       logger.log(`Processing ${username}...`);
 
       // 1. Fetch
-      const rawData = await githubAdapter.fetchRawData(username, token);
+      const rawData = await githubAdapter.fetchRawData(octokit, username);
 
       // 2. Score
       const result = scoringService.score(rawData);

@@ -22,13 +22,13 @@ export class CacheService {
    */
   buildCacheKey(username?: string, walletAddress?: string): string {
     if (username && walletAddress) {
-      return `analysis:${username.toLowerCase()}:${walletAddress.toLowerCase()}`;
+      return `analysis:${username.toLowerCase()}:${walletAddress}`;
     }
     if (username) {
       return `analysis:${username.toLowerCase()}`;
     }
     if (walletAddress) {
-      return `analysis:wallet:${walletAddress.toLowerCase()}`;
+      return `analysis:wallet:${walletAddress}`;
     }
     throw new Error('Either username or walletAddress must be provided');
   }

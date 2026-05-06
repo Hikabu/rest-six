@@ -182,6 +182,7 @@ if (req.user) {
       walletAddress,
       mode,
       useGithubCache,
+      userId: req.user?.id ?? null,
     },
 {attempts: 1});
 
@@ -264,6 +265,7 @@ async recompute(@Body() body: RecomputeAnalysisDto) {
     walletAddress: input.walletAddress,
     mode: input.mode,
     useGithubCache: input.useGithubCache,
+    userId,
   });
 
   return { jobId: jobRecord.id };

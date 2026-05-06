@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Octokit } from 'octokit';
 import { ScorecardUiDto } from './contract/scorecard.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScorecardResult } from './scorecard.types';
@@ -32,7 +33,16 @@ export class ScorecardService {
       throw new Error('GITHUB_SYSTEM_TOKEN not configured');
     }
 
-    await this.githubAdapter.fetchRawData(githubUsername, githubToken);
+    const octokit = new Octokit({
+      auth: githubToken,
+      request: {
+        headers: {
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      },
+    });
+
+    await this.githubAdapter.fetchRawData(octokit, githubUsername);
 
     return this.buildPlaceholderResult();
   }

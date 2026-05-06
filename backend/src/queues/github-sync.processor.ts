@@ -5,6 +5,7 @@ import { GithubAdapterService } from '../modules/scoring/github-adapter/github-a
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncStatus } from '@prisma/client';
 import { InjectQueue } from '@nestjs/bullmq';
+import { OctokitFactory } from '../modules/scoring/github-adapter/octokit.factory';
 
 @Processor('github-sync', { concurrency: 5 })
 export class GithubSyncProcessor extends WorkerHost {
@@ -14,6 +15,7 @@ export class GithubSyncProcessor extends WorkerHost {
     private readonly githubAdapter: GithubAdapterService,
     private readonly prisma: PrismaService,
     @InjectQueue('signal-compute') private readonly signalQueue: Queue,
+    private readonly octokitFactory: OctokitFactory,
   ) {
     super();
   }
@@ -47,12 +49,10 @@ export class GithubSyncProcessor extends WorkerHost {
       });
 
       // (c) Call consolidated fetcher
-      const token = await this.githubAdapter.decryptToken(
-        profile.encryptedToken,
-      );
+      const octokit = await this.octokitFactory.forJob(profile.userId);
       const rawData = await this.githubAdapter.fetchRawData(
+        octokit,
         profile.githubUsername,
-        token,
       );
 
       // (d) Set syncProgress = analyzing_projects (40% - interim)
