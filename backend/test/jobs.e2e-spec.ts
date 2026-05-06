@@ -40,7 +40,7 @@ describe('Jobs Filtering E2E', () => {
 
     // Get JWT
     const loginRes = await request(server)
-      .post('/auth/login')
+      .post('/auth/employer/login')
       .set('Authorization', 'Bearer debugtoken')
       .send({ walletAddress: '0xJOBS_TESTER' });
     appJwt = loginRes.body.data.accessToken;
@@ -98,7 +98,18 @@ describe('Jobs Filtering E2E', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    try {
+      await app.close();
+    } catch (err) {
+      console.error('Error closing app:', err);
+    }
+    try {
+      if (prisma) {
+        await prisma.$disconnect();
+      }
+    } catch (err) {
+      console.error('Error disconnecting Prisma:', err);
+    }
   });
 
   it('GET /jobs should return all active jobs', async () => {

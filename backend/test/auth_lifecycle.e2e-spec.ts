@@ -23,17 +23,17 @@ describe('Auth Lifecycle (e2e)', () => {
 
   it('/auth/register (POST) -> Blocked Access', async () => {
     const registerResponse = await request(app.getHttpServer())
-      .post('/auth/register')
+      .post('/auth/candidate/register')
       .send(testUser)
-      .expect(201);
+      .expect(302);
 
-    expect(registerResponse.body.needsVerification).toBe(true);
-    expect(registerResponse.body.accessToken).toBeUndefined();
+    const location = registerResponse.headers.location;
+    expect(location).toContain('/verify?email=');
 
     // Verify protected route is blocked
     await request(app.getHttpServer())
       .post('/auth/logout')
-      .set('Authorization', `Bearer ${registerResponse.body.accessToken}`)
+      .set('Authorization', `Bearer undefined`)
       .expect(401);
   });
 
@@ -42,9 +42,9 @@ describe('Auth Lifecycle (e2e)', () => {
     // because the code for verification stub logs the code to console.
     // However, the AuthService allows verification via a code in Redis.
     await request(app.getHttpServer())
-      .post('/auth/register')
+      .post('/auth/candidate/register')
       .send(testUser)
-      .expect(201);
+      .expect(302);
 
     // For the sake of the E2E test lifecycle, we'll manually verify the user
     // to test that the login flow then works.
@@ -55,29 +55,33 @@ describe('Auth Lifecycle (e2e)', () => {
     });
 
     const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/auth/candidate/login')
       .send({
         identifier: testUser.email,
         password: testUser.password,
       })
-      .expect(201);
+      .expect(200);
 
-    expect(loginResponse.body.accessToken).toBeDefined();
-    expect(loginResponse.body.refreshToken).toBeDefined();
+    const cookies = loginResponse.headers['set-cookie'];
+    const accessToken = cookies.find((c: string) => c.startsWith('access_token=')).split('=')[1].split(';')[0];
+    const refreshToken = cookies.find((c: string) => c.startsWith('refresh_token=')).split('=')[1].split(';')[0];
+    
+    expect(accessToken).toBeDefined();
+    expect(refreshToken).toBeDefined();
 
     // Verify protected route is now accessible
     await request(app.getHttpServer())
       .post('/auth/logout')
-      .set('Authorization', `Bearer ${loginResponse.body.accessToken}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(201);
   });
 
   it('should handle full password reset flow', async () => {
     const email = `reset-lifecycle-${Date.now()}@example.com`;
     await request(app.getHttpServer())
-      .post('/auth/register')
+      .post('/auth/candidate/register')
       .send({ email, password: 'StrongPassword123!', role: 'CANDIDATE' })
-      .expect(201);
+      .expect(302);
 
     // 1. Request reset
     await request(app.getHttpServer())
@@ -101,10 +105,10 @@ describe('Auth Lifecycle (e2e)', () => {
 
     // 4. Verify login with NEW password
     const loginRes = await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/auth/candidate/login')
       .send({ identifier: email, password: 'NewStrongPassword123!' })
-      .expect(201);
+      .expect(200);
 
-    expect(loginRes.status).toBe(201);
+    expect(loginRes.status).toBe(200);
   });
 });

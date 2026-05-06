@@ -96,6 +96,8 @@ describe('Colosseum Stage 2 Analysis Web3 & Edge Cases (E2E)', () => {
       return mockGithubProfiles[username];
     }),
     decryptToken: jest.fn().mockReturnValue('mock-token'),
+    getRateLimitRemaining: jest.fn().mockResolvedValue(5000),
+    checkRateLimitOrThrow: jest.fn().mockResolvedValue(true),
   };
 
   const mockSolanaAdapter = {

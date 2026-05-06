@@ -81,12 +81,12 @@ describe('Auth OAuth (e2e)', () => {
       // 1. Create a logged in user
       const email = `link-${testId}@example.com`;
       await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/auth/candidate/register')
         .send({ email, password: 'StrongPassword123!', role: 'CANDIDATE' })
-        .expect(201);
+        .expect(302);
 
       const loginRes = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/auth/candidate/login')
         .send({ identifier: email, password: 'StrongPassword123!' })
         .expect(201);
 
@@ -99,7 +99,7 @@ describe('Auth OAuth (e2e)', () => {
       });
 
       const verifiedLogin = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/auth/candidate/login')
         .send({ identifier: email, password: 'StrongPassword123!' })
         .expect(201);
 
@@ -120,9 +120,9 @@ describe('Auth OAuth (e2e)', () => {
       // 1. Register but DON'T verify
       const email = `hijack-${testId}@example.com`;
       await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/auth/candidate/register')
         .send({ email, password: 'StrongPassword123!', role: 'CANDIDATE' })
-        .expect(201);
+        .expect(302);
 
       // 2. External provider returns same email
       const authService = app.get(AuthService);

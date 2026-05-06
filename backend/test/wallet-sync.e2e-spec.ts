@@ -55,8 +55,7 @@ describe('Wallet Sync (e2e)', () => {
     testUser = await prisma.user.create({
       data: {
         email: 'test@example.com',
-        passwordHash: 'hashed',
-        role: 'candidate',
+        role: 'CANDIDATE',
         isEmailVerified: true,
       },
     });
@@ -75,12 +74,29 @@ describe('Wallet Sync (e2e)', () => {
       },
     });
 
-    authToken = jwtService.sign({ sub: testUser.id, role: 'candidate' });
+    authToken = jwtService.sign({ sub: testUser.id, role: 'CANDIDATE' });
   });
 
   afterAll(async () => {
-    await app.close();
-    await redis.quit();
+    try {
+      await app.close();
+    } catch (err) {
+      console.error('Error closing app:', err);
+    }
+    try {
+      if (prisma) {
+        await prisma.$disconnect();
+      }
+    } catch (err) {
+      console.error('Error disconnecting Prisma:', err);
+    }
+    try {
+      if (redis) {
+        await redis.quit();
+      }
+    } catch (err) {
+      console.error('Error quitting Redis:', err);
+    }
   });
 
   describe('GET /sync/wallet/challenge', () => {

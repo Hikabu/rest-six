@@ -43,9 +43,9 @@ describe('Auth Hijacking Prevention (e2e)', () => {
       role: 'CANDIDATE',
     };
     await request(app.getHttpServer())
-      .post('/auth/register')
+      .post('/auth/candidate/register')
       .send(targetUser)
-      .expect(201);
+      .expect(302);
 
     //verify
     await prisma.user.update({
@@ -57,7 +57,7 @@ describe('Auth Hijacking Prevention (e2e)', () => {
     // For this test, we just need a JWT for the target user ID.
 
     const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/auth/candidate/login')
       .send({
         identifier: targetUser.email,
         password: targetUser.password,

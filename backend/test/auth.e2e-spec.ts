@@ -58,14 +58,25 @@ describe('Auth (e2e)', () => {
   });
 
   afterAll(async () => {
-    if (app) {
-      await app.close();
+    try {
+      if (app) {
+        await app.close();
+      }
+    } catch (err) {
+      console.error('Error closing app:', err);
+    }
+    try {
+      if (prisma) {
+        await prisma.$disconnect();
+      }
+    } catch (err) {
+      console.error('Error disconnecting Prisma:', err);
     }
   });
 
   it('/auth/login (POST) - should create company and return JWT', async () => {
     const response = await request(server)
-      .post('/auth/login')
+      .post('/auth/employer/login')
       .set('Authorization', 'Bearer mock-token')
       .send({
         walletAddress: '0x123',
@@ -80,19 +91,19 @@ describe('Auth (e2e)', () => {
       where: { privyId: 'test-privy-id' },
     });
     expect(company).toBeDefined();
-    expect(company?.walletAddress).toBe('0xTEST_WALLET');
+    expect(company?.walletAddress).toBe('0x123');
   });
 
   it('/companies/me (GET) - should return company profile with JWT', async () => {
     const loginRes = await request(server)
-      .post('/auth/login')
+      .post('/auth/employer/login')
       .set('Authorization', 'Bearer mock-token')
       .send({ walletAddress: '0x123' });
 
     const token = loginRes.body.data.accessToken;
 
     const response = await request(server)
-      .get('/companies/me')
+      .get('/me/company')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
@@ -102,14 +113,14 @@ describe('Auth (e2e)', () => {
 
   it('/jobs (POST) - should create a job', async () => {
     const loginRes = await request(server)
-      .post('/auth/login')
+      .post('/auth/employer/login')
       .set('Authorization', 'Bearer mock-token')
       .send({ walletAddress: '0x123' });
 
     const token = loginRes.body.data.accessToken;
 
     const response = await request(server)
-      .post('/jobs')
+      .post('/jobs/draft')
       .set('Authorization', `Bearer ${token}`)
       .send({
         title: 'Software Engineer',
@@ -124,14 +135,14 @@ describe('Auth (e2e)', () => {
 
   it('/analytics/dashboard (GET) - should return stats', async () => {
     const loginRes = await request(server)
-      .post('/auth/login')
+      .post('/auth/employer/login')
       .set('Authorization', 'Bearer mock-token')
       .send({ walletAddress: '0x123' });
 
     const token = loginRes.body.data.accessToken;
 
     await request(server)
-      .post('/jobs')
+      .post('/jobs/draft')
       .set('Authorization', `Bearer ${token}`)
       .send({
         title: 'Analytics Test Job',
@@ -150,6 +161,6 @@ describe('Auth (e2e)', () => {
   });
 
   it('Protected route should fail without token', async () => {
-    await request(server).get('/companies/me').expect(401);
+    await request(server).get('/me/company').expect(401);
   });
 });

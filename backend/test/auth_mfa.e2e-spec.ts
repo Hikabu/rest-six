@@ -17,9 +17,9 @@ describe('Auth MFA (e2e)', () => {
     // Register and verify a user for MFA tests
     const email = `mfa-e2e-${testId}@example.com`;
     const regRes = await request(app.getHttpServer())
-      .post('/auth/register')
+      .post('/auth/candidate/register')
       .send({ email, password: 'StrongPassword123!', role: 'CANDIDATE' })
-      .expect(201);
+      .expect(302);
 
     userId = await setup.prisma.user
       .findUnique({ where: { email } })
@@ -30,7 +30,7 @@ describe('Auth MFA (e2e)', () => {
     });
 
     const loginRes = await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/auth/candidate/login')
       .send({ identifier: email, password: 'StrongPassword123!' })
       .expect(201);
 
@@ -66,7 +66,7 @@ describe('Auth MFA (e2e)', () => {
 
     // 3. Login with MFA
     const loginRes = await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/auth/candidate/login')
       .send({
         identifier: `mfa-e2e-${testId}@example.com`,
         password: 'StrongPassword123!',

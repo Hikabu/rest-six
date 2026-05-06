@@ -25,7 +25,7 @@ describe('Auth Security (e2e)', () => {
       let res;
       for (let i = 0; i < 6; i++) {
         res = await request(setup.app.getHttpServer())
-          .post('/auth/login')
+          .post('/auth/candidate/login')
           .send({ identifier: email, password: 'wrong-password' });
         if (i < 5) {
           expect(res.status).toBe(401);
@@ -42,17 +42,17 @@ describe('Auth Security (e2e)', () => {
       // Limit is 5 per minute globally, but let's just spam it
       for (let i = 0; i < 5; i++) {
         await request(app.getHttpServer())
-          .post('/auth/register')
+          .post('/auth/candidate/register')
           .send({
             email: `spam-${i}-${testId}@example.com`,
             password: 'StrongPassword123!',
             role: 'CANDIDATE',
           })
-          .expect(201);
+          .expect(302);
       }
 
       const res = await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/auth/candidate/register')
         .send({
           email: `spam-final-${testId}@example.com`,
           password: 'StrongPassword123!',
@@ -67,9 +67,9 @@ describe('Auth Security (e2e)', () => {
     it('should revoke all sessions on refresh token reuse', async () => {
       const email = `hijack-${testId}@example.com`;
       await request(app.getHttpServer())
-        .post('/auth/register')
+        .post('/auth/candidate/register')
         .send({ email, password: 'StrongPassword123!', role: 'CANDIDATE' })
-        .expect(201);
+        .expect(302);
 
       const authService = app.get(AuthService);
 
@@ -81,28 +81,28 @@ describe('Auth Security (e2e)', () => {
 
       // 1. First login
       const res1 = await request(app.getHttpServer())
-        .post('/auth/login')
+        .post('/auth/candidate/login')
         .send({ identifier: email, password: 'StrongPassword123!' })
         .expect(201);
       const rt1 = res1.body.refreshToken;
 
       // 2. Refresh tokens (RT1 is used, RT2 is issued)
       const res2 = await request(app.getHttpServer())
-        .post('/auth/refresh')
+        .post('/auth/candidate/refresh')
         .set('Authorization', `Bearer ${rt1}`)
         .expect(201);
       const rt2 = res2.body.refreshToken;
 
       // // 3. Attempt to reuse RT1 (Simulated attacker!)
       const res3 = await request(app.getHttpServer())
-        .post('/auth/refresh')
+        .post('/auth/candidate/refresh')
         .set('Authorization', `Bearer ${rt1}`);
 
       expect(res3.status).toBe(401);
 
       // // 4. RT2 should now also be invalid because of reuse detection
       const res4 = await request(app.getHttpServer())
-        .post('/auth/refresh')
+        .post('/auth/candidate/refresh')
         .set('Authorization', `Bearer ${rt2}`);
 
       expect(res4.status).toBe(401);

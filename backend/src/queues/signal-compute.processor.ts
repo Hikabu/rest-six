@@ -13,7 +13,7 @@ import { SolanaAdapterService } from '../modules/scoring/web3-adapter/solana-ada
 import { Web3MergeService } from '../modules/scoring/web3-merge/web3-merge.service';
 import { OctokitFactory } from '../modules/scoring/github-adapter/octokit.factory';
 
-@Processor('signal-compute', { concurrency: 10 })
+@Processor('signal-compute', { concurrency: process.env.NODE_ENV === 'test' ? 1 : 10 })
 export class SignalComputeProcessor extends WorkerHost {
   private readonly logger = new Logger(SignalComputeProcessor.name);
 

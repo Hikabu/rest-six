@@ -40,6 +40,8 @@ describe('Colosseum Stage 2 Pipeline (E2E)', () => {
       }
     }),
     decryptToken: jest.fn().mockReturnValue('mock-token'),
+    getRateLimitRemaining: jest.fn().mockResolvedValue(5000),
+    checkRateLimitOrThrow: jest.fn().mockResolvedValue(true),
   };
 
   beforeAll(async () => {

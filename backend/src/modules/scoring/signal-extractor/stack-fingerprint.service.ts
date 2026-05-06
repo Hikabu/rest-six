@@ -35,8 +35,12 @@ export class StackFingerprintService {
    * Detects tools from flattened manifest keys across all repositories.
    * deduplicates and sorts alphabetically.
    */
-  detectTools(manifestKeys: Record<string, string[]>): string[] {
+  detectTools(manifestKeys: Record<string, string[]> | undefined | null): string[] {
     const tools = new Set<string>();
+
+    if (!manifestKeys) {
+      return [];
+    }
 
     // Flatten all dependency keys from all repositories
     const allKeys = Object.values(manifestKeys).flat();
@@ -64,7 +68,7 @@ export class StackFingerprintService {
    * @param languages Pre-extracted top languages to be passed through.
    */
   extract(
-    manifestKeys: Record<string, string[]>,
+    manifestKeys: Record<string, string[]> | undefined | null,
     languages: string[],
   ): { languages: string[]; tools: string[] } {
     return {

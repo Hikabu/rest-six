@@ -29,6 +29,8 @@ describe('Vouch Lifecycle (e2e)', () => {
 
   const mockGithubAdapter = {
     fetchRawData: jest.fn().mockResolvedValue({ repos: [], commits: [], pulls: [] }),
+    getRateLimitRemaining: jest.fn().mockResolvedValue(5000),
+    checkRateLimitOrThrow: jest.fn().mockResolvedValue(true),
   };
   const mockSolanaAdapter = {
     fetchProgramsByAuthority: jest.fn().mockResolvedValue({ programs: [], achievements: [] }),
@@ -86,10 +88,16 @@ describe('Vouch Lifecycle (e2e)', () => {
           email: 'vouch@example.com',
         },
       });
-      const devProfile = await prisma.devProfile.create({
+      const candidate = await prisma.candidate.create({
+        data: {
+          id: 'cand_vouch_1',
+          userId: user.id,
+        },
+      });
+      await prisma.developerCandidate.create({
         data: {
           id: 'dev_vouch_1',
-          userId: user.id,
+          candidateId: candidate.id,
           web3Profile: {
             create: {
               solanaAddress: 'CandidateWalletXXXXXXXXXXXXXXXXX',
@@ -97,25 +105,33 @@ describe('Vouch Lifecycle (e2e)', () => {
           },
         },
       });
-      await prisma.candidate.create({
-        data: {
-          id: 'cand_vouch_1',
-          userId: user.id,
-          devProfileId: devProfile.id,
-        },
-      });
     }
   });
 
   afterAll(async () => {
-    await prisma.vouch.deleteMany({});
-    await prisma.web3Profile.deleteMany({ where: { solanaAddress: 'CandidateWalletXXXXXXXXXXXXXXXXX' } });
-    await prisma.devProfile.deleteMany({ where: { id: 'dev_vouch_1' } });
-    await prisma.candidate.deleteMany({ where: { id: 'cand_vouch_1' } });
-    await prisma.user.deleteMany({ where: { id: 'user_vouch_1' } });
+    try {
+      await prisma.vouch.deleteMany({});
+      await prisma.web3Profile.deleteMany({ where: { solanaAddress: 'CandidateWalletXXXXXXXXXXXXXXXXX' } });
+      await prisma.developerCandidate.deleteMany({ where: { id: 'dev_vouch_1' } });
+      await prisma.candidate.deleteMany({ where: { id: 'cand_vouch_1' } });
+      await prisma.user.deleteMany({ where: { id: 'user_vouch_1' } });
+    } catch (err) {
+      console.error('Error cleaning up data:', err);
+    }
     
     jest.restoreAllMocks();
-    await app.close();
+    try {
+      await app.close();
+    } catch (err) {
+      console.error('Error closing app:', err);
+    }
+    try {
+      if (prisma) {
+        await prisma.$disconnect();
+      }
+    } catch (err) {
+      console.error('Error disconnecting Prisma:', err);
+    }
   });
 
   beforeEach(async () => {

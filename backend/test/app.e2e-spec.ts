@@ -57,7 +57,18 @@ describe('APP E2E', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    try {
+      await app.close();
+    } catch (err) {
+      console.error('Error closing app:', err);
+    }
+    try {
+      if (prisma) {
+        await prisma.$disconnect();
+      }
+    } catch (err) {
+      console.error('Error disconnecting Prisma:', err);
+    }
   });
 
   it('GET / should return Hello World', async () => {
@@ -68,14 +79,14 @@ describe('APP E2E', () => {
 
   it('POST /auth/login should fail without token', async () => {
     const res = await request(server)
-      .post('/auth/login')
+      .post('/auth/employer/login')
       .send({ walletAddress: '0x123' });
     expect(res.status).toBe(401);
   });
 
   it('POST /auth/login should return 400 when walletAddress is missing', async () => {
     const res = await request(server)
-      .post('/auth/login')
+      .post('/auth/employer/login')
       .set('Authorization', 'Bearer debugtoken')
       .send({});
     expect(res.status).toBe(400);
@@ -86,7 +97,7 @@ describe('APP E2E', () => {
 
   it('POST /auth/login should return app JWT', async () => {
     const res = await request(server)
-      .post('/auth/login')
+      .post('/auth/employer/login')
       .set('Authorization', 'Bearer debugtoken')
       .send({
         walletAddress: '0x123',
