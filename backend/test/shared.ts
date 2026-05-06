@@ -22,27 +22,64 @@ export const getCookieValue = (
 };
 
 export const resetBefore = async () => {
-
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
   }).compile();
 
   const app: INestApplication<App> = moduleFixture.createNestApplication();
 
-  await app.init();
+  try {
+    await app.init();
 
-  const prisma: PrismaService = app.get(PrismaService);
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User" CASCADE;`);
-  await prisma.$connect();
-  const id = crypto.randomBytes(16).toString('hex');
-  const shortId = crypto.createHash('md5').update(id).digest('hex').slice(0, 8);
+    const prisma: PrismaService = app.get(PrismaService);
+    await prisma.$connect();
+    await resetDatabase(prisma);
+    const id = crypto.randomBytes(16).toString('hex');
+    const shortId = crypto
+      .createHash('md5')
+      .update(id)
+      .digest('hex')
+      .slice(0, 8);
 
-  return {
-    app,
-    prisma,
-    id,
-    shortId,
-  };
+    return {
+      app,
+      prisma,
+      id,
+      shortId,
+    };
+  } catch (err) {
+    await resetAfter(app);
+    throw err;
+  }
+};
+
+const resetDatabase = async (prisma: PrismaService) => {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User" CASCADE;`);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts || !isTransientDatabaseResetError(err)) {
+        throw err;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+    }
+  }
+};
+
+const isTransientDatabaseResetError = (err: unknown) => {
+  if (!err || typeof err !== 'object') return false;
+
+  const error = err as { code?: string; message?: string };
+  return (
+    error.code === '40P01' ||
+    error.code === '55P03' ||
+    error.message?.includes('deadlock detected') ||
+    error.message?.includes('could not obtain lock')
+  );
 };
 
 export const resetAfter = async (app: INestApplication<App>) => {
