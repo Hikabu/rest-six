@@ -79,6 +79,7 @@ export class GithubSyncService {
       where: { devCandidateId: devProfile.id },
       create: {
         devCandidate: { connect: { id: devProfile.id } },
+        user: { connect: { id: userId } },
         githubUsername: githubData.username,
         githubUserId: githubData.githubId,
         encryptedToken,
@@ -88,6 +89,7 @@ export class GithubSyncService {
         // Rotate token on re-connect (expired or user re-authorized)
         githubUsername: githubData.username,
         githubUserId: githubData.githubId,
+        user: { connect: { id: userId } },
         encryptedToken,
         scopes: githubData.scopes,
         syncStatus: SyncStatus.PENDING,
@@ -147,6 +149,7 @@ export class GithubSyncService {
       candidateId: devProfile.candidateId,
       devCandidateId: devProfile.id,
       githubProfileId: githubProfile.id,
+      userId,
     });
 
     return {

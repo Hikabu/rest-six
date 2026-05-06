@@ -14,7 +14,7 @@ export const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string(),
   GITHUB_CLIENT_SECRET: z.string(),
   GITHUB_PRIVATE_KEY: z.string(),
-  GITHUB_SYSTEM_TOKEN: z.string(),
+  GITHUB_SYSTEM_TOKEN: z.string().min(1),
 
   GOOGLE_CLIENT_ID: z.string(),
   GOOGLE_CLIENT_SECRET: z.string(),

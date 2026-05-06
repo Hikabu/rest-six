@@ -49,6 +49,7 @@ export class SignalComputeProcessor extends WorkerHost {
       mode,
       userId,
     } = job.data;
+    const bullmqJobId = job.id?.toString();
 
     this.logger.log(
       `Starting signal pipeline for profile ${
@@ -161,13 +162,14 @@ export class SignalComputeProcessor extends WorkerHost {
         await this.updateProgress(profile?.id, 'fetching_repos', 20);
 
         try {
-          const octokit = await this.octokitFactory.forJob(userId ?? null);
+          const resolvedUserId = userId ?? profile?.userId ?? null;
+          const octokit = await this.octokitFactory.forJob(resolvedUserId);
 
           const before = await this.githubAdapter.getRateLimitRemaining(octokit);
 
           if (mode === 'github+wallet') {
             const [gitResponse, w3Response] = await Promise.all([
-              this.githubAdapter.fetchRawData(octokit, githubUsername, recordId),
+              this.githubAdapter.fetchRawData(octokit, githubUsername, bullmqJobId),
               this.solanaAdapter.fetchOnChainData(walletAddress!),
             ]);
             rawData = gitResponse;
@@ -176,14 +178,15 @@ export class SignalComputeProcessor extends WorkerHost {
             rawData = await this.githubAdapter.fetchRawData(
               octokit,
               githubUsername,
-              recordId,
+              bullmqJobId,
             );
           }
 
           const after = await this.githubAdapter.getRateLimitRemaining(octokit);
 
           this.logger.log({
-            jobId: recordId,
+            jobId: bullmqJobId,
+            analysisJobId: recordId,
             apiCallsUsed: before - after,
             remainingAfter: after
           }, 'github_fetch_complete');

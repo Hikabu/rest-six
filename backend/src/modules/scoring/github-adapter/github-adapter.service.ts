@@ -43,9 +43,9 @@ export class GithubAdapterService {
     try {
       const token = this.decryptToken(profile.encryptedToken);
       const octokit = new Octokit({
-        auth: token,
         request: {
           headers: {
+            authorization: `token ${token}`,
             'X-GitHub-Api-Version': '2022-11-28',
           },
         },

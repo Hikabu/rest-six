@@ -54,6 +54,36 @@ describe('OctokitFactory', () => {
     jest.clearAllMocks();
   });
 
+  it('throws at startup when GITHUB_SYSTEM_TOKEN is missing', async () => {
+    await expect(
+      Test.createTestingModule({
+        providers: [
+          OctokitFactory,
+          {
+            provide: PrismaService,
+            useValue: {
+              githubProfile: {
+                findUnique: jest.fn(),
+              },
+            },
+          },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn((key: string) => {
+                if (key === 'AUTH_ENCRYPTION_KEY') return 'test-key';
+                if (key === 'GITHUB_SYSTEM_TOKEN') return undefined;
+                return null;
+              }),
+            },
+          },
+        ],
+      }).compile(),
+    ).rejects.toThrow(
+      'GITHUB_SYSTEM_TOKEN is not set. Set it in .env. Without it all GitHub requests are unauthenticated (60 req/hr).',
+    );
+  });
+
   it('1. userId present, profile has encryptedToken -> decrypt called, Octokit created with decrypted token', async () => {
     (prisma.githubProfile.findUnique as jest.Mock).mockResolvedValue({
       encryptedToken: 'v1:encrypted-token',
@@ -66,10 +96,18 @@ describe('OctokitFactory', () => {
       select: { encryptedToken: true },
     });
     expect(Octokit).toHaveBeenCalledWith(
-      expect.objectContaining({ auth: 'decrypted-encrypted-token' }),
+      expect.objectContaining({
+        request: expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: 'token decrypted-encrypted-token',
+          }),
+        }),
+      }),
     );
     // Verify it's not the system token
-    expect((octokit as any)._config.auth).toEqual('decrypted-encrypted-token');
+    expect((octokit as any)._config.request.headers.authorization).toEqual(
+      'token decrypted-encrypted-token',
+    );
   });
 
   it('2. userId present, profile has no encryptedToken -> falls back to system token', async () => {
@@ -80,7 +118,13 @@ describe('OctokitFactory', () => {
     const octokit = await factory.forJob('user-1');
 
     expect(Octokit).toHaveBeenCalledWith(
-      expect.objectContaining({ auth: 'system-token' }),
+      expect.objectContaining({
+        request: expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: 'token system-token',
+          }),
+        }),
+      }),
     );
   });
 
@@ -102,7 +146,13 @@ describe('OctokitFactory', () => {
       'octokit_token_decrypt_failed',
     );
     expect(Octokit).toHaveBeenCalledWith(
-      expect.objectContaining({ auth: 'system-token' }),
+      expect.objectContaining({
+        request: expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: 'token system-token',
+          }),
+        }),
+      }),
     );
   });
 
@@ -111,7 +161,13 @@ describe('OctokitFactory', () => {
 
     expect(prisma.githubProfile.findUnique).not.toHaveBeenCalled();
     expect(Octokit).toHaveBeenCalledWith(
-      expect.objectContaining({ auth: 'system-token' }),
+      expect.objectContaining({
+        request: expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: 'token system-token',
+          }),
+        }),
+      }),
     );
   });
 });

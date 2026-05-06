@@ -21,14 +21,34 @@ export class GithubSyncProcessor extends WorkerHost {
   }
 
   async process(
-    job: Job<{ candidateId: string; githubProfileId: string }>,
+    job: Job<{
+      candidateId: string;
+      devCandidateId?: string;
+      githubProfileId: string;
+      userId?: string | null;
+    }>,
   ): Promise<any> {
     const { candidateId, githubProfileId } = job.data;
-    this.logger.log(`Starting GitHub sync for profile ${githubProfileId}`);
+    const jobId = job.id?.toString();
+    this.logger.log({
+      jobId,
+      githubProfileId,
+    }, 'github_sync_started');
 
     // (a) Load GithubProfile
     const profile = await this.prisma.githubProfile.findUnique({
       where: { id: githubProfileId },
+      include: {
+        devCandidate: {
+          select: {
+            candidate: {
+              select: {
+                userId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!profile) {
@@ -49,10 +69,13 @@ export class GithubSyncProcessor extends WorkerHost {
       });
 
       // (c) Call consolidated fetcher
-      const octokit = await this.octokitFactory.forJob(profile.userId);
+      const resolvedUserId =
+        job.data.userId ?? profile.userId ?? profile.devCandidate.candidate.userId;
+      const octokit = await this.octokitFactory.forJob(resolvedUserId);
       const rawData = await this.githubAdapter.fetchRawData(
         octokit,
         profile.githubUsername,
+        jobId,
       );
 
       // (d) Set syncProgress = analyzing_projects (40% - interim)
@@ -95,7 +118,10 @@ export class GithubSyncProcessor extends WorkerHost {
       //       attempts: process.env.NODE_ENV === 'test' ? 1 : 3,
       //     });
 
-      this.logger.log(`GitHub sync completed for profile ${githubProfileId}`);
+      this.logger.log({
+        jobId,
+        githubProfileId,
+      }, 'github_sync_completed');
     } catch (error) {
       this.logger.error(
         `GitHub sync failed for profile ${githubProfileId}: ${error.message}`,

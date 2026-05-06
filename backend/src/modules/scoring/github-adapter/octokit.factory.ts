@@ -11,7 +11,20 @@ export class OctokitFactory {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-  ) {}
+  ) {
+    const systemToken = this.config.get<string>('GITHUB_SYSTEM_TOKEN');
+    if (!systemToken) {
+      throw new Error(
+        'GITHUB_SYSTEM_TOKEN is not set. ' +
+          'Set it in .env. Without it all GitHub requests are unauthenticated (60 req/hr).',
+      );
+    }
+
+    this.logger.log(
+      { tokenLength: systemToken.length },
+      'octokit_factory_ready',
+    );
+  }
 
   async forJob(userId: string | null): Promise<Octokit> {
     if (userId) {
@@ -32,9 +45,9 @@ export class OctokitFactory {
           const token = decrypt(data, key);
           this.logger.debug({ userId }, 'octokit_using_user_token');
           return new Octokit({
-            auth: token,
             request: {
               headers: {
+                authorization: `token ${token}`,
                 'X-GitHub-Api-Version': '2022-11-28',
               },
             },
@@ -49,15 +62,29 @@ export class OctokitFactory {
       }
     }
 
-    // Anonymous or token unavailable — use system token
+    const systemToken = this.config.get<string>('GITHUB_SYSTEM_TOKEN');
+
+    // This should never happen after the constructor guard above,
+    // but log clearly if it somehow does.
+    if (!systemToken) {
+      this.logger.error(
+        'GITHUB_SYSTEM_TOKEN is undefined at request time — making unauthenticated request',
+      );
+      return new Octokit();
+    }
+
     this.logger.debug(
-      { userId: userId ?? 'anonymous' },
+      {
+        userId: userId ?? 'anonymous',
+        tokenSource: 'system_pat',
+        tokenHint: `${systemToken.slice(0, 8)}...`,
+      },
       'octokit_using_system_token',
     );
     return new Octokit({
-      auth: this.config.get<string>('GITHUB_SYSTEM_TOKEN'),
       request: {
         headers: {
+          authorization: `token ${systemToken}`,
           'X-GitHub-Api-Version': '2022-11-28',
         },
       },

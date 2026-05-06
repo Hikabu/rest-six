@@ -37,6 +37,8 @@ describe('GithubSyncService', () => {
   let service: GithubSyncService;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GithubSyncService,
@@ -53,5 +55,32 @@ describe('GithubSyncService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('adds userId to github sync jobs', async () => {
+    mockProfileResolver.ensureDevStack.mockResolvedValueOnce({
+      devProfile: {
+        id: 'dev_1',
+        candidateId: 'cand_1',
+        githubProfile: {
+          id: 'github_1',
+          githubUsername: 'alice',
+          lastSyncAt: null,
+        },
+      },
+    });
+    mockPrisma.githubProfile.update.mockResolvedValueOnce({
+      id: 'github_1',
+      githubUsername: 'alice',
+    });
+
+    await service.triggerSync('user_1');
+
+    expect(mockQueue.add).toHaveBeenCalledWith('sync-profile', {
+      candidateId: 'cand_1',
+      devCandidateId: 'dev_1',
+      githubProfileId: 'github_1',
+      userId: 'user_1',
+    });
   });
 });

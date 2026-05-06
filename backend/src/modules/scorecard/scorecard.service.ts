@@ -34,9 +34,9 @@ export class ScorecardService {
     }
 
     const octokit = new Octokit({
-      auth: githubToken,
       request: {
         headers: {
+          authorization: `token ${githubToken}`,
           'X-GitHub-Api-Version': '2022-11-28',
         },
       },
