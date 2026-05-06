@@ -21,6 +21,7 @@ const VOUCH_BUDGET = 5;
 const VOUCH_TTL_DAYS = 180;
 const CLUSTER_WINDOW_MS = 86_400_000; // 24 h
 const CLUSTER_THRESHOLD = 3;
+const E2E_RECENT_BLOCKHASH = '11111111111111111111111111111111';
 
 export interface ConfirmVouchInput {
   /** GitHub username or User.username of the candidate being vouched for */
@@ -431,35 +432,22 @@ if (!memoFound) {
   ): Promise<string> {
     const usingDevnet = this.config.get<string>('USING_DEVNET') === 'true';
 
-const rpcUrl = usingDevnet
-  ? this.config.get<string>('SOLANA_DEVNET_RPC_URL')
-  : this.config.get<string>('SOLANA_RPC_URL');
+    const rpcUrl = usingDevnet
+      ? this.config.get<string>('SOLANA_DEVNET_RPC_URL')
+      : this.config.get<string>('SOLANA_RPC_URL');
 
-if (!rpcUrl) {
-  throw new BadRequestException('Solana RPC not configured');
-}
-
-this.logger.log(`Using RPC: ${rpcUrl}`);
     if (!rpcUrl) {
-      throw new BadRequestException('SOLANA_RPC_URL not configured');
+      throw new BadRequestException('Solana RPC not configured');
     }
-	try {
-  const res = await fetch(rpcUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'getHealth',
-    }),
-  });
 
-  // console.log('RPC status:', res.status);
-  // console.log('RPC text:', await res.text());
-} catch (e) {
-  console.error('RAW FETCH ERROR:', e);
-}
-    const connection = new Connection(rpcUrl, 'confirmed');
+    this.logger.debug(`Using RPC: ${rpcUrl}`);
+    const isTest = this.config.get<string>('NODE_ENV') === 'test';
+    let blockhash = E2E_RECENT_BLOCKHASH;
+    if (!isTest) {
+      const connection = new Connection(rpcUrl, 'confirmed');
+      const latest = await connection.getLatestBlockhash('finalized');
+      blockhash = latest.blockhash;
+    }
 
     const memoData = JSON.stringify({
       type: 'vouch',
@@ -484,7 +472,6 @@ this.logger.log(`Using RPC: ${rpcUrl}`);
     );
 
     tx.feePayer = new PublicKey(account);
-    const { blockhash } = await connection.getLatestBlockhash('finalized');
     tx.recentBlockhash = blockhash;
 
     // Serialize without requiring all signatures (wallet will sign next)

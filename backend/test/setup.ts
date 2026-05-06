@@ -1,7 +1,7 @@
 process.env.NODE_ENV = 'test';
 
 process.env.DATABASE_URL ??=
-  'postgresql://postgres:strong@localhost:5432/a16zero?schema=public&connection_limit=5&connect_timeout=10';
+'postgresql://postgres:strong@localhost:5432/16signals?schema=public&connection_limit=5&connect_timeout=10';
 
 jest.mock(
   'otplib',

@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:17-bookworm
-    container_name: a16zero
+    container_name: 16signals
     restart: unless-stopped
     ports:
       - "5432:5432"
