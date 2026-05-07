@@ -35,7 +35,7 @@ const requiredForGithubAuth = [
 const deployedEnvironments = new Set<string>(['staging', 'production']);
 const encryptionKeySchema = z
   .string()
-  .regex(/^[0-9a-fA-F]{64}$/, 'must be a 64-character hex string (32 bytes)',);
+  .regex(/^[0-9a-fA-F]{64}$/, 'must be a 64-character hex string (32 bytes)');
 
 const hasPrismaPooler = (databaseUrl: string) => {
   try {

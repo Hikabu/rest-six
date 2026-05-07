@@ -76,9 +76,10 @@ describe('Fetcher Performance Benchmark', () => {
   let githubAdapter: GithubAdapterService;
   let signalExtractor: SignalExtractorService;
   let scoringService: ScoringService;
+  let module: TestingModule;
 
   beforeAll(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         GithubAdapterService,
         SignalExtractorService,
@@ -103,6 +104,10 @@ describe('Fetcher Performance Benchmark', () => {
     githubAdapter = module.get(GithubAdapterService);
     signalExtractor = module.get(SignalExtractorService);
     scoringService = module.get(ScoringService);
+  });
+
+  afterAll(async () => {
+    await module.close();
   });
 
   it('should process full pipeline within 2000ms budget', async () => {

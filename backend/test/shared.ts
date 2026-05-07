@@ -7,6 +7,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import * as crypto from 'crypto';
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { getQueueToken } from '@nestjs/bullmq';
 
 export const getCookieValue = (
   setCookie: string[] | string | undefined,
@@ -92,10 +93,14 @@ export const resetAfter = async (app: INestApplication<App>) => {
     console.error('Error disconnecting Prisma:', err);
   }
 
-  const redis = app.get('REDIS');
+  await closeQueues(app);
+
+  const redis = app.get('REDIS', { strict: false });
   try {
     if (redis && typeof redis.quit === 'function') {
       await redis.quit();
+    } else if (redis && typeof redis.disconnect === 'function') {
+      await redis.disconnect();
     }
   } catch (err) {
     console.error('Error quitting Redis:', err);
@@ -106,6 +111,43 @@ export const resetAfter = async (app: INestApplication<App>) => {
   } catch (err) {
     console.error('Error closing app:', err);
   }
+};
+
+const closeQueues = async (app: INestApplication<App>) => {
+  const queueTokens = [
+    getQueueToken('github-sync'),
+    getQueueToken('signal-compute'),
+    getQueueToken('email'),
+  ];
+
+  await Promise.all(
+    queueTokens.map(async (token) => {
+      let queue: unknown;
+      try {
+        queue = app.get(token, { strict: false });
+      } catch {
+        return;
+      }
+
+      try {
+        if (
+          queue &&
+          typeof (queue as { close?: unknown }).close === 'function'
+        ) {
+          await (queue as { close: () => Promise<void> | void }).close();
+        } else if (
+          queue &&
+          typeof (queue as { disconnect?: unknown }).disconnect === 'function'
+        ) {
+          await (
+            queue as { disconnect: () => Promise<void> | void }
+          ).disconnect();
+        }
+      } catch (err) {
+        console.error(`Error closing queue ${String(token)}:`, err);
+      }
+    }),
+  );
 };
 
 @Injectable()

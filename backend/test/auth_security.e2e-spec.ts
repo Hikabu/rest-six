@@ -25,22 +25,25 @@ describe('Auth Security (e2e)', () => {
   describe('Rate Limiting', () => {
     it('should trigger internal rate limit on login after 5 failures', async () => {
       const setup = await resetBeforeNoThrottle();
-      const email = `fail-${testId}@example.com`;
+      try {
+        const email = `fail-${testId}@example.com`;
 
-      let res;
-      for (let i = 0; i < 6; i++) {
-        res = await request(setup.app.getHttpServer())
-          .post('/auth/candidate/login')
-          .send({ identifier: email, password: 'wrong-password' });
-        if (i < 5) {
-          expect(res.status).toBe(401);
-          expect(res.body.message).toContain('Invalid credentials');
+        let res;
+        for (let i = 0; i < 6; i++) {
+          res = await request(setup.app.getHttpServer())
+            .post('/auth/candidate/login')
+            .send({ identifier: email, password: 'wrong-password' });
+          if (i < 5) {
+            expect(res.status).toBe(401);
+            expect(res.body.message).toContain('Invalid credentials');
+          }
         }
-      }
 
-      expect(res.status).toBe(401);
-      expect(res.body.message).toContain('Too many login attempts');
-      await resetAfter(setup.app);
+        expect(res.status).toBe(401);
+        expect(res.body.message).toContain('Too many login attempts');
+      } finally {
+        await resetAfter(setup.app);
+      }
     });
 
     it('should allow registration under the configured high test throttle', async () => {

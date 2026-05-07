@@ -16,7 +16,7 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:deploy": "eslint src/main.ts src/app.module.ts src/shared/config/*.ts src/modules/health/*.ts",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest --runInBand",
+    "test": "jest --runInBand --detectOpenHandles --forceExit",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -129,6 +129,9 @@
     "testEnvironment": "node",
     "setupFiles": [
       "../test/setup.ts"
+    ],
+    "setupFilesAfterEnv": [
+      "../test/jest.setup.ts"
     ],
     "transformIgnorePatterns": [
       "node_modules/(?!(@scure|@noble|otplib|octokit|@octokit|universal-user-agent|before-after-hook)/)"
