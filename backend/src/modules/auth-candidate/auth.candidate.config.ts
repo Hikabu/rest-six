@@ -1,6 +1,7 @@
 export default () => ({
   app: {
-    url: process.env.SERVER_URL || 'http://localhost:3000',
+    url: process.env.SERVER_URL,
+    frontendUrl: process.env.FRONTEND_URL,
   },
   auth: {
     githubCallback: '/auth/candidate/github/callback',

@@ -4,6 +4,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 
+type EmployerJwtPayload = {
+  sub: string;
+};
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-employer') {
   constructor(
@@ -20,7 +24,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-employer') {
     });
   }
 
-  async validate(payload: any) {
+  async validate(payload: EmployerJwtPayload) {
     const company = await this.prisma.company.findUnique({
       where: { id: payload.sub },
     });

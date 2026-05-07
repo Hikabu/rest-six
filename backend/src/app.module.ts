@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { ZodValidationPipeProvider } from './shared/config/zod.config';
+import { ConfigModule } from './shared/config/config.module';
 
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
@@ -11,6 +12,7 @@ import { GithubSyncModule } from './modules/github-sync/github-sync.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { HealthModule } from './modules/health/health.module';
 import { QueuesModule } from './queues/queues.module';
+import { TestQueuesModule } from './queues/test-queues.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
 import { EmailModule } from './modules/email/email.module';
 import { ScorecardModule } from './modules/scorecard/scorecard.module';
@@ -52,6 +54,7 @@ import { EscrowModule } from './modules/escrow/escrow.module';
             : undefined,
       },
     }),
+    ConfigModule,
     PrismaModule,
     RedisModule,
     AnalyticsModule,
@@ -62,7 +65,7 @@ import { EscrowModule } from './modules/escrow/escrow.module';
     AuthCandidateModule,
     CompaniesModule,
     HealthModule,
-    QueuesModule,
+    process.env.NODE_ENV === 'test' ? TestQueuesModule : QueuesModule,
     ScoringModule,
     EmailModule,
     ScorecardModule,

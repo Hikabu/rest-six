@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { JobStatus, RoleType, Seniority, JobPost } from '@prisma/client';
@@ -8,35 +12,33 @@ import { AppException } from '../../shared/app.exception';
 export class JobsService {
   constructor(private prisma: PrismaService) {}
 
- 
-async create(companyId: string, dto: CreateJobDto) {
-  const data: any = {
-    title: dto.title,
-    description: dto.description,
-    companyId,
-    status: JobStatus.DRAFT,
-  };
+  async create(companyId: string, dto: CreateJobDto) {
+    const data: any = {
+      title: dto.title,
+      description: dto.description,
+      companyId,
+      status: JobStatus.DRAFT,
+    };
 
-  if (dto.location) {
-    data.location = dto.location;
+    if (dto.location) {
+      data.location = dto.location;
+    }
+
+    if (dto.employmentType) {
+      data.employmentType = dto.employmentType;
+    }
+
+    if (dto.currency) {
+      data.currency = dto.currency;
+    }
+
+    if (dto.bonusAmount !== undefined) {
+      data.bonusAmount = dto.bonusAmount;
+    }
+
+    return this.prisma.jobPost.create({ data });
   }
-
-  if (dto.employmentType) {
-    data.employmentType = dto.employmentType;
-  }
-
-  if (dto.currency) {
-    data.currency = dto.currency;
-  }
-
-  if (dto.bonusAmount !== undefined) {
-    data.bonusAmount = dto.bonusAmount;
-  }
-
-  return this.prisma.jobPost.create({ data });
-}
   async findMyJobs(companyId: string) {
-    console.log("Finding jobs for companyId: ", companyId);
     return this.prisma.jobPost.findMany({
       where: { companyId },
       orderBy: { createdAt: 'desc' },
@@ -83,7 +85,11 @@ async create(companyId: string, dto: CreateJobDto) {
     return job;
   }
 
-  async confirmRequirements(jobId: string, companyId: string, parsed: any): Promise<JobPost> {
+  async confirmRequirements(
+    jobId: string,
+    companyId: string,
+    parsed: any,
+  ): Promise<JobPost> {
     const job = await this.prisma.jobPost.findUnique({ where: { id: jobId } });
     if (!job || job.companyId !== companyId) throw new NotFoundException();
 
@@ -94,12 +100,12 @@ async create(companyId: string, dto: CreateJobDto) {
         parsedRequirements: parsed, // keep full blob intact
 
         // ── Promote to typed columns ──────────────────────────────────────
-        roleType:         parsed.requiredRoleType ?? job.roleType,
-        seniorityLevel:   parsed.seniorityLevel ?? job.seniorityLevel,
-        requiredSkills:   parsed.requiredSkills ?? [],       // string array from AI parse
-        isWeb3Role:       parsed.isWeb3Role ?? job.isWeb3Role,
-        dynamicWeights:   parsed.dynamicWeights ?? job.dynamicWeights,
-      }
+        roleType: parsed.requiredRoleType ?? job.roleType,
+        seniorityLevel: parsed.seniorityLevel ?? job.seniorityLevel,
+        requiredSkills: parsed.requiredSkills ?? [], // string array from AI parse
+        isWeb3Role: parsed.isWeb3Role ?? job.isWeb3Role,
+        dynamicWeights: parsed.dynamicWeights ?? job.dynamicWeights,
+      },
     });
   }
 
@@ -112,7 +118,15 @@ async create(companyId: string, dto: CreateJobDto) {
     page?: number;
     limit?: number;
   }) {
-    const { search, roleType, seniority, skills, isWeb3, page = 1, limit = 20 } = query;
+    const {
+      search,
+      roleType,
+      seniority,
+      skills,
+      isWeb3,
+      page = 1,
+      limit = 20,
+    } = query;
     const take = Math.min(limit, 50);
     const skip = (page - 1) * take;
 
@@ -138,11 +152,9 @@ async create(companyId: string, dto: CreateJobDto) {
     if (skills?.length) {
       where.requiredSkills = { hasSome: skills };
     }
-    
+
     const isWeb3Bool =
-  isWeb3 === undefined
-    ? undefined
-    : isWeb3 === true || isWeb3 === 'true';
+      isWeb3 === undefined ? undefined : isWeb3 === true || isWeb3 === 'true';
 
     if (isWeb3 !== undefined) {
       where.isWeb3Role = isWeb3Bool ?? false;

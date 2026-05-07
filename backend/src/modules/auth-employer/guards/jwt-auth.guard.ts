@@ -9,11 +9,6 @@ export class JwtAuthGuard extends AuthGuard('jwt-employer') {
   }
 
   canActivate(context: ExecutionContext) {
-     const request = context.switchToHttp().getRequest();
-
-  const authHeader = request.headers['authorization'];
-  console.log("HEADERS:", request.headers);
-  console.log('AUTH HEADER:', authHeader);
     const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
       context.getHandler(),
       context.getClass(),

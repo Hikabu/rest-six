@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Req, Query, BadRequestException, Res, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  Req,
+  Query,
+  BadRequestException,
+  Res,
+  NotFoundException,
+} from '@nestjs/common';
 import { Response } from 'express';
 import {
   ApiTags,
@@ -40,7 +53,7 @@ export class ApplicantsController extends BaseController {
   ) {
     super();
   }
-   // ─────────────────────────────
+  // ─────────────────────────────
   // CANDIDATE: GAP PREVIEW
   // ─────────────────────────────
 
@@ -49,8 +62,7 @@ export class ApplicantsController extends BaseController {
   @ApiOperation({
     summary: 'Preview gap analysis',
     description:
-      'Returns gap analysis BEFORE applying.\n\n' +
-      'Does not persist data.',
+      'Returns gap analysis BEFORE applying.\n\n' + 'Does not persist data.',
   })
   @ApiQuery({
     name: 'jobId',
@@ -65,8 +77,10 @@ export class ApplicantsController extends BaseController {
   async getGapPreview(@Req() req: any, @Query('jobId') jobId: string) {
     if (!jobId) throw new BadRequestException('jobId is required');
 
-    const preview = await this.applicantsService.getGapPreview(jobId, req.user.id);
-	console.log("preview: ", preview);
+    const preview = await this.applicantsService.getGapPreview(
+      jobId,
+      req.user.id,
+    );
     return this.handleSuccess(preview);
   }
 
@@ -104,10 +118,13 @@ export class ApplicantsController extends BaseController {
   })
   async apply(@Req() req: any, @Param('jobId') jobId: string) {
     const application = await this.applicantsService.apply(jobId, req.user.id);
-    return this.handleCreated(application, 'Application submitted successfully');
+    return this.handleCreated(
+      application,
+      'Application submitted successfully',
+    );
   }
 
-    // ─────────────────────────────
+  // ─────────────────────────────
   // CANDIDATE: MY APPLICATIONS
   // ─────────────────────────────
 
@@ -119,7 +136,9 @@ export class ApplicantsController extends BaseController {
       'Returns candidate applications with human-readable pipeline stages.',
   })
   async getMyApplications(@Req() req: any) {
-    const list = await this.applicantsService.findCandidateApplications(req.user.id);
+    const list = await this.applicantsService.findCandidateApplications(
+      req.user.id,
+    );
     return this.handleSuccess(list);
   }
 
@@ -164,9 +183,13 @@ export class ApplicantsController extends BaseController {
   async getJobApplications(
     @Req() req: any,
     @Param('jobId') jobId: string,
-    @Query() filters: ApplicationFiltersDto
+    @Query() filters: ApplicationFiltersDto,
   ) {
-    const list = await this.applicantsService.findByJob(jobId, req.user.id, filters);
+    const list = await this.applicantsService.findByJob(
+      jobId,
+      req.user.id,
+      filters,
+    );
     return this.handleSuccess(list);
   }
 
@@ -200,14 +223,15 @@ export class ApplicantsController extends BaseController {
           reputationNote: 'Verified by 5 peers on-chain',
           appliedAt: '2026-04-20T10:00:00Z',
           pipelineStage: 'INTERVIEW_TECHNICAL',
-          candidate: { name: 'Alice Smith', username: 'alice_dev' }
+          candidate: { name: 'Alice Smith', username: 'alice_dev' },
         },
         technicalView: {
-          technicalSummary: 'Expert in React and Node.js. Missing Rust experience.',
+          technicalSummary:
+            'Expert in React and Node.js. Missing Rust experience.',
           strengths: ['Architecture', 'Testing'],
           risks: ['No experience with high-scale DBs'],
           roleFitScore: 85,
-          fitTier: 'STRONG'
+          fitTier: 'STRONG',
         },
         decisionCard: {
           verdict: 'PROCEED',
@@ -216,17 +240,17 @@ export class ApplicantsController extends BaseController {
           gapDetail: {
             overallVerdict: 'PROCEED',
             technologyFitScore: 0.85,
-            gaps: [{ dimension: 'Rust', severity: 'SIGNIFICANT' }]
-          }
+            gaps: [{ dimension: 'Rust', severity: 'SIGNIFICANT' }],
+          },
         },
         interviewQuestions: {
           stage: 'INTERVIEW_TECHNICAL',
-          questions: [{ question: 'Explain X', priority: 'MUST_ASK' }]
+          questions: [{ question: 'Explain X', priority: 'MUST_ASK' }],
         },
         notObservable: ['Communication quality'],
-        pipelineStageHistory: [{ stage: 'APPLIED', movedAt: '...' }]
-      }
-    }
+        pipelineStageHistory: [{ stage: 'APPLIED', movedAt: '...' }],
+      },
+    },
   })
   @ApiNotFoundResponse({
     description: 'Application not found',
@@ -252,12 +276,12 @@ export class ApplicantsController extends BaseController {
   async applyDecision(
     @Req() req: any,
     @Param('appId') appId: string,
-    @Body() body: ApplyDecisionDto
+    @Body() body: ApplyDecisionDto,
   ) {
     const updated = await this.applicantsService.applyDecision(
       appId,
       body.status,
-      req.user.id
+      req.user.id,
     );
     return this.handleSuccess(updated, 'Decision applied successfully');
   }
@@ -276,9 +300,12 @@ export class ApplicantsController extends BaseController {
   async getScorecard(
     @Req() req: any,
     @Param('appId') appId: string,
-    @Res() res: Response
+    @Res() res: Response,
   ) {
-    const application = await this.applicantsService.findRawById(appId, req.user.id);
+    const application = await this.applicantsService.findRawById(
+      appId,
+      req.user.id,
+    );
     if (!application) throw new NotFoundException('Application not found');
 
     const html = this.scorecardRendererService.render(application);
@@ -303,18 +330,17 @@ export class ApplicantsController extends BaseController {
   async advanceApplicationStage(
     @Req() req: any,
     @Param('appId') appId: string,
-    @Body() body: AdvanceStageDto
+    @Body() body: AdvanceStageDto,
   ) {
     const updated = await this.applicantsService.advanceStage(
       appId,
       req.user.id,
       body.stage,
-      body.note
+      body.note,
     );
 
     return this.handleSuccess(updated, 'Pipeline stage advanced');
   }
-
 
   // ─────────────────────────────
   // HR: INTERVIEW QUESTIONS
@@ -339,13 +365,13 @@ export class ApplicantsController extends BaseController {
   async getInterviewQuestions(
     @Req() req: any,
     @Param('appId') appId: string,
-    @Query('stage') stage?: string
+    @Query('stage') stage?: string,
   ) {
     const app = await this.applicantsService.findById(appId, req.user.id);
 
     const rawApp = await this.applicantsService['prisma'].shortlist.findUnique({
       where: { id: appId },
-      select: { interviewQuestions: true }
+      select: { interviewQuestions: true },
     });
 
     const interviewQuestions = (rawApp as any)?.interviewQuestions || [];
@@ -359,7 +385,8 @@ export class ApplicantsController extends BaseController {
       if (match) return this.handleSuccess(match);
     }
 
-    return this.handleSuccess(interviewQuestions[interviewQuestions.length - 1]);
+    return this.handleSuccess(
+      interviewQuestions[interviewQuestions.length - 1],
+    );
   }
- 
 }

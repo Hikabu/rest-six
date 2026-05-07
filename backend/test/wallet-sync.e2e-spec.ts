@@ -74,7 +74,14 @@ describe('Wallet Sync (e2e)', () => {
       },
     });
 
-    authToken = jwtService.sign({ sub: testUser.id, role: 'CANDIDATE' });
+    authToken = jwtService.sign(
+      {
+        sub: testUser.id,
+        role: 'CANDIDATE',
+        isEmailVerified: true,
+      },
+      { secret: process.env.JWT_ACCESS_SECRET },
+    );
   });
 
   afterAll(async () => {
@@ -168,7 +175,9 @@ describe('Wallet Sync (e2e)', () => {
       const challenge = 'test-challenge';
       await redis.set(`wallet-challenge:${testUser.id}`, challenge, 'EX', 300);
 
-      const wrongSig = bs58.encode(nacl.sign.detached(Buffer.from('wrong'), keypair.secretKey));
+      const wrongSig = bs58.encode(
+        nacl.sign.detached(Buffer.from('wrong'), keypair.secretKey),
+      );
 
       await request(app.getHttpServer())
         .post('/sync/wallet')
@@ -218,7 +227,10 @@ describe('Wallet Sync (e2e)', () => {
   describe('Regression: POST /sync/github', () => {
     it('should NOT return scorecard data and NOT trigger analysis job row', async () => {
       // Pre-link github to avoid GITHUB_NOT_CONNECTED
-      const candidate = await prisma.candidate.findUnique({ where: { userId: testUser.id }, include: { devProfile: true } });
+      const candidate = await prisma.candidate.findUnique({
+        where: { userId: testUser.id },
+        include: { devProfile: true },
+      });
       await prisma.githubProfile.create({
         data: {
           devCandidateId: candidate!.devProfile!.id,

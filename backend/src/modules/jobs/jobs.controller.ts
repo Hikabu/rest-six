@@ -27,7 +27,7 @@ import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { ParseJobDescriptionDto } from './dto/parse-jd.dto';
 import {
-	ParsedJobRequirementsSwaggerDto,
+  ParsedJobRequirementsSwaggerDto,
   ParsedJobRequirementsDto,
   ParsedJobRequirementsSchema,
 } from './dto/confirm-requirements.dto';
@@ -62,7 +62,8 @@ export class JobsController extends BaseController {
   @Get()
   @ApiOperation({
     summary: 'Browse open jobs (Public)',
-    description: 'Returns a list of published jobs with filtering and pagination.',
+    description:
+      'Returns a list of published jobs with filtering and pagination.',
   })
   async getPublicJobs(@Query() query: GetJobsQueryDto) {
     const jobs = await this.jobsService.getPublicJobs({
@@ -82,7 +83,7 @@ export class JobsController extends BaseController {
 
   @Get('me')
   @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt-employer'))
+  @UseGuards(AuthGuard('jwt-employer'))
   @ApiOperation({
     summary: 'Get all jobs created by the authenticated company',
     description:
@@ -110,7 +111,6 @@ export class JobsController extends BaseController {
     type: ErrorResponseDto,
   })
   async getMyJobs(@Req() req: any) {
-    console.log("user: ", req.user);
     const jobs = await this.jobsService.findMyJobs(req.user.id);
     return this.handleSuccess(jobs);
   }
@@ -130,14 +130,13 @@ export class JobsController extends BaseController {
     return this.handleSuccess(job);
   }
 
-
   // ─────────────────────────────
   // CREATE JOB
   // ─────────────────────────────
 
-  @Post("draft")
+  @Post('draft')
   @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt-employer'))
+  @UseGuards(AuthGuard('jwt-employer'))
   @ApiOperation({
     summary: 'Create a new job post draft',
     description:
@@ -183,7 +182,7 @@ export class JobsController extends BaseController {
 
   @Post(':id/parse-jd')
   @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt-employer'))
+  @UseGuards(AuthGuard('jwt-employer'))
   @ApiOperation({
     summary: 'Parse job description into structured requirements',
     description:
@@ -223,7 +222,7 @@ export class JobsController extends BaseController {
 
   @Post(':id/confirm-requirements')
   @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt-employer'))
+  @UseGuards(AuthGuard('jwt-employer'))
   @ApiOperation({
     summary: 'Confirm parsed job requirements',
     description:
@@ -258,7 +257,11 @@ export class JobsController extends BaseController {
       return this.handleSuccess(job, 'Job requirements confirmed and updated');
     }
 
-    const updatedJob = await this.jobsService.confirmRequirements(id, req.user.id, body);
+    const updatedJob = await this.jobsService.confirmRequirements(
+      id,
+      req.user.id,
+      body,
+    );
 
     this.logger.log(
       `AUDIT_LOG: { entityType: 'Job', entityId: '${id}', action: 'REQUIREMENTS_CONFIRMED' }`,
@@ -275,7 +278,7 @@ export class JobsController extends BaseController {
 
   @Post(':id/publish')
   @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt-employer'))
+  @UseGuards(AuthGuard('jwt-employer'))
   @ApiOperation({
     summary: 'Publish a job',
     description:
@@ -310,7 +313,7 @@ export class JobsController extends BaseController {
 
   @Post(':id/close')
   @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt-employer'))
+  @UseGuards(AuthGuard('jwt-employer'))
   @ApiOperation({
     summary: 'Close a job',
     description:

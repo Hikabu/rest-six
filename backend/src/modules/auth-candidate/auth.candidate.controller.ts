@@ -47,7 +47,34 @@ import { AuthState } from './schemas/auth-result.dto';
 @Throttle({ default: { limit: 500, ttl: 60000 } })
 @Controller('auth/candidate')
 export class AuthCandidateController {
-  constructor(private readonly authService: AuthCandidateService) {}
+  constructor(
+    private readonly authService: AuthCandidateService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private frontendUrl() {
+    return this.config.get<string>('app.frontendUrl');
+  }
+
+  private redirectOrJson(
+    res: Response,
+    path: string,
+    fallbackBody: Record<string, unknown>,
+  ) {
+    const frontendUrl = this.frontendUrl();
+    if (!frontendUrl) {
+      return res.status(200).json(fallbackBody);
+    }
+    return res.redirect(new URL(path, frontendUrl).toString());
+  }
+
+  private authCookieOptions() {
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+    };
+  }
 
   private handleAuthResponse(
     res: Response,
@@ -56,26 +83,45 @@ export class AuthCandidateController {
   ) {
     switch (result.type) {
       case AuthState.SUCCESS: {
-        res.cookie('access_token', result.data.accessToken, { httpOnly: true });
+        res.cookie(
+          'access_token',
+          result.data.accessToken,
+          this.authCookieOptions(),
+        );
         res.cookie('refresh_token', result.data.refreshToken, {
-          httpOnly: true,
+          ...this.authCookieOptions(),
         });
         return res.status(200).json({ success: true });
       }
 
       case AuthState.NEEDS_VERIFICATION:
-        return res.redirect(
-          `http://localhost:3001/verify?email=${result.data.email}`,
+        return this.redirectOrJson(
+          res,
+          `/verify?email=${encodeURIComponent(result.data.email)}`,
+          { success: false, state: result.type, email: result.data.email },
         );
 
       case AuthState.MFA_REQUIRED:
-        return res.redirect(
-          `http://localhost:3001/mfa?token=${result.data.mfaToken}`,
+        return this.redirectOrJson(
+          res,
+          `/mfa?token=${encodeURIComponent(result.data.mfaToken)}`,
+          {
+            success: false,
+            state: result.type,
+            mfaToken: result.data.mfaToken,
+          },
         );
 
       case AuthState.NEEDS_ONBOARDING:
-        res.cookie('temp_auth', result.data.tempToken, { httpOnly: true });
-        return res.redirect('http://localhost:3001/onboarding');
+        res.cookie(
+          'temp_auth',
+          result.data.tempToken,
+          this.authCookieOptions(),
+        );
+        return this.redirectOrJson(res, '/onboarding', {
+          success: false,
+          state: result.type,
+        });
 
       default:
         return res.status(401).json({ message: 'Invalid auth state' });
@@ -199,8 +245,8 @@ export class AuthCandidateController {
   async completeOnboarding(
     @Body() dto: OnboardingDto,
     @Req() req: any,
-@Res() res: Response  ) {
-	console.log('DTO:', dto);
+    @Res() res: Response,
+  ) {
     const result = await this.authService.completeOnboarding(
       dto,
       req.onboarding,
@@ -289,8 +335,6 @@ export class AuthCandidateController {
     summary: 'Refresh tokens',
   })
   async refresh(@Req() req: any, @Res() res: Response) {
-    console.log('REFRESH ENDPOINT HIT');
-    console.log('USER:', req.user);
     const result = await this.authService.refresh(req.user);
     return this.handleAuthResponse(res, result);
   }

@@ -32,8 +32,9 @@ describe('Jobs Filtering E2E', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-      console.log('DATABASE_URL:', process.env.DATABASE_URL);
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
     server = app.getHttpAdapter().getInstance();
     prisma = moduleFixture.get<PrismaService>(PrismaService);

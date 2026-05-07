@@ -12,7 +12,6 @@ import {
   BadRequestException,
   UsePipes,
   ValidationPipe,
-
   UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
@@ -32,7 +31,7 @@ import {
   ApiUnauthorizedResponse,
   ApiNotFoundResponse,
   ApiBearerAuth,
-  ApiHeader
+  ApiHeader,
 } from '@nestjs/swagger';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -60,7 +59,7 @@ export class AnalysisController {
     @InjectQueue('signal-compute') private readonly signalQueue: Queue,
     private readonly cacheService: CacheService,
     private readonly prisma: PrismaService,
-	private readonly profileResolver: ProfileResolverService,
+    private readonly profileResolver: ProfileResolverService,
     private readonly githubAdapter: GithubAdapterService,
     private readonly solanaAdapter: SolanaAdapterService,
     private readonly signalExtractor: SignalExtractorService,
@@ -87,61 +86,61 @@ Features:
     `,
   })
   @ApiBody({
-  type: CreateAnalysisDto,
-  required: false,
-  description: `
+    type: CreateAnalysisDto,
+    required: false,
+    description: `
 Optional if authenticated.
 
 - If JWT is provided → body is ignored (uses linked accounts)
 - If no JWT → must provide githubUsername or walletAddress
 `,
-})
+  })
   @ApiCreatedResponse({ type: JobQueueResponseDto })
   @ApiBadRequestResponse({ type: AnalysisErrorResponseDto })
   async createAnalysis(
     @Req() req: any,
-@Body() body?: CreateAnalysisDto & { force?: boolean }  ) {
+    @Body() body?: CreateAnalysisDto & { force?: boolean },
+  ) {
     let githubUsername: string | null = null;
     let walletAddress: string | null = null;
     let useGithubCache = false;
 
-//     if (req.user) {
-//       const userId = req.user.id;
-//     //   const githubProfile = await this.prisma.githubProfile.findUnique({
-//     //     where: { userId },
-//     //   });
-// 	const { devProfile } = await this.profileResolver.ensureDevStack(userId);
+    //     if (req.user) {
+    //       const userId = req.user.id;
+    //     //   const githubProfile = await this.prisma.githubProfile.findUnique({
+    //     //     where: { userId },
+    //     //   });
+    // 	const { devProfile } = await this.profileResolver.ensureDevStack(userId);
 
-// const githubProfile = devProfile?.githubProfile;
-// const web3Profile = devProfile?.web3Profile;
-// console.log('devProfile:', devProfile);
-// console.log('githubProfile:', githubProfile);
-//     //   const web3Profile = await this.prisma.web3Profile.findUnique({
-//     //     where: { userId },
-//     //   });
+    // const githubProfile = devProfile?.githubProfile;
+    // const web3Profile = devProfile?.web3Profile;
+    // console.log('devProfile:', devProfile);
+    // console.log('githubProfile:', githubProfile);
+    //     //   const web3Profile = await this.prisma.web3Profile.findUnique({
+    //     //     where: { userId },
+    //     //   });
 
-//       if (!githubProfile && !web3Profile) {
-//         throw new BadRequestException(
-//           'No linked accounts. Use POST /sync/github or POST /sync/wallet first.',
-//         );
-//       }
+    //       if (!githubProfile && !web3Profile) {
+    //         throw new BadRequestException(
+    //           'No linked accounts. Use POST /sync/github or POST /sync/wallet first.',
+    //         );
+    //       }
 
-//       githubUsername = githubProfile?.githubUsername ?? null;
-//       walletAddress = web3Profile?.solanaAddress ?? null;
+    //       githubUsername = githubProfile?.githubUsername ?? null;
+    //       walletAddress = web3Profile?.solanaAddress ?? null;
 
-//       if (githubProfile?.lastSyncAt) {
-//         useGithubCache =
-//           githubProfile.lastSyncAt.getTime() > Date.now() - 86_400_000;
-//       }
-//     } 
-if (req.user) {
-  const input = await this.resolveInputFromUser(req.user.id);
+    //       if (githubProfile?.lastSyncAt) {
+    //         useGithubCache =
+    //           githubProfile.lastSyncAt.getTime() > Date.now() - 86_400_000;
+    //       }
+    //     }
+    if (req.user) {
+      const input = await this.resolveInputFromUser(req.user.id);
 
-  githubUsername = input.githubUsername;
-  walletAddress = input.walletAddress;
-  useGithubCache = input.useGithubCache ?? false;
-}
-	else {
+      githubUsername = input.githubUsername;
+      walletAddress = input.walletAddress;
+      useGithubCache = input.useGithubCache ?? false;
+    } else {
       githubUsername = body?.githubUsername ?? null;
       walletAddress = body?.walletAddress ?? null;
 
@@ -219,10 +218,10 @@ if (req.user) {
   @UseGuards(InternalKeyGuard)
   @ApiBearerAuth()
   @ApiHeader({
-  name: 'x-internal-key',
-  required: true,
-  description: 'Internal API key',
-})
+    name: 'x-internal-key',
+    required: true,
+    description: 'Internal API key',
+  })
   @ApiOperation({
     summary: 'Recompute analysis',
     description: `
@@ -249,105 +248,105 @@ Use this for admin/system reprocessing.
     description: 'Profile not found',
     type: AnalysisErrorResponseDto,
   })
-async recompute(@Body() body: RecomputeAnalysisDto) {
-  const { userId, force } = body;
+  async recompute(@Body() body: RecomputeAnalysisDto) {
+    const { userId, force } = body;
 
-  if (!userId) {
-    throw new BadRequestException('userId is required');
-  }
-
-  const input = await this.resolveInputFromUser(userId);
-
-  const cacheKey = this.cacheService.buildCacheKey(
-    input.githubUsername ?? undefined,
-    input.walletAddress ?? undefined,
-  );
-
-  if (!force) {
-    const cached = await this.cacheService.get(cacheKey);
-    if (cached) {
-      const result = await this.withFreshVouchSignal(cacheKey, cached);
-      return { jobId: `cached-${cacheKey}`, cached: true, result };
+    if (!userId) {
+      throw new BadRequestException('userId is required');
     }
-  }
 
-  const jobRecord = await this.prisma.analysisJob.create({
-    data: {
-      status: 'pending',
-      input: {
+    const input = await this.resolveInputFromUser(userId);
+
+    const cacheKey = this.cacheService.buildCacheKey(
+      input.githubUsername ?? undefined,
+      input.walletAddress ?? undefined,
+    );
+
+    if (!force) {
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        const result = await this.withFreshVouchSignal(cacheKey, cached);
+        return { jobId: `cached-${cacheKey}`, cached: true, result };
+      }
+    }
+
+    const jobRecord = await this.prisma.analysisJob.create({
+      data: {
+        status: 'pending',
+        input: {
+          githubUsername: input.githubUsername,
+          walletAddress: input.walletAddress,
+          mode: input.mode,
+          useGithubCache: input.useGithubCache ?? false,
+        } as any,
+        userId, // ✅ ALWAYS SET
+      },
+    });
+
+    if (this.shouldProcessInlineForE2E()) {
+      await this.processAnalysisInlineForE2E({
+        jobId: jobRecord.id,
         githubUsername: input.githubUsername,
         walletAddress: input.walletAddress,
         mode: input.mode,
-        useGithubCache: input.useGithubCache ?? false,
-      } as any,
-      userId, // ✅ ALWAYS SET
-    },
-  });
+        useGithubCache: input.useGithubCache,
+      });
+    } else {
+      await this.signalQueue.add('analyze', {
+        jobId: jobRecord.id,
+        githubUsername: input.githubUsername,
+        walletAddress: input.walletAddress,
+        mode: input.mode,
+        useGithubCache: input.useGithubCache,
+        userId,
+      });
+    }
 
-  if (this.shouldProcessInlineForE2E()) {
-    await this.processAnalysisInlineForE2E({
-      jobId: jobRecord.id,
-      githubUsername: input.githubUsername,
-      walletAddress: input.walletAddress,
-      mode: input.mode,
-      useGithubCache: input.useGithubCache,
-    });
-  } else {
-    await this.signalQueue.add('analyze', {
-      jobId: jobRecord.id,
-      githubUsername: input.githubUsername,
-      walletAddress: input.walletAddress,
-      mode: input.mode,
-      useGithubCache: input.useGithubCache,
-      userId,
-    });
+    return { jobId: jobRecord.id };
   }
+  //   async recompute(@Req() req: any, @Body() body: RecomputeAnalysisDto) {
+  // 	// console.log(body);
+  //     return this.createAnalysis(req, { ...body, force: true });
+  //   }
+  private async resolveInputFromUser(userId: string): Promise<{
+    githubUsername: string | null;
+    walletAddress: string | null;
+    useGithubCache: boolean; // ✅ force strict boolean
+    mode: 'github+wallet' | 'wallet-only' | 'github-only';
+  }> {
+    const { devProfile } = await this.profileResolver.ensureDevStack(userId);
 
-  return { jobId: jobRecord.id };
-}
-//   async recompute(@Req() req: any, @Body() body: RecomputeAnalysisDto) {
-// 	// console.log(body);
-//     return this.createAnalysis(req, { ...body, force: true });
-//   }
-private async resolveInputFromUser(userId: string):Promise<{
-  githubUsername: string | null;
-  walletAddress: string | null;
-  useGithubCache: boolean; // ✅ force strict boolean
-  mode: 'github+wallet' | 'wallet-only' | 'github-only';
-}>  {
-  const { devProfile } = await this.profileResolver.ensureDevStack(userId);
+    const githubProfile = devProfile?.githubProfile;
+    const web3Profile = devProfile?.web3Profile;
 
-  const githubProfile = devProfile?.githubProfile;
-  const web3Profile = devProfile?.web3Profile;
+    if (!githubProfile && !web3Profile) {
+      throw new NotFoundException(
+        'No linked accounts. Use POST /sync/github or POST /sync/wallet first.',
+      );
+    }
 
-  if (!githubProfile && !web3Profile) {
-    throw new NotFoundException(
-      'No linked accounts. Use POST /sync/github or POST /sync/wallet first.',
+    const githubUsername = githubProfile?.githubUsername ?? null;
+    const walletAddress = web3Profile?.solanaAddress ?? null;
+
+    const useGithubCache = !!(
+      githubProfile?.lastSyncAt &&
+      githubProfile.lastSyncAt.getTime() > Date.now() - 86_400_000
     );
+
+    const mode =
+      githubUsername && walletAddress
+        ? 'github+wallet'
+        : walletAddress
+          ? 'wallet-only'
+          : 'github-only';
+
+    return {
+      githubUsername,
+      walletAddress,
+      useGithubCache,
+      mode,
+    };
   }
-
-  const githubUsername = githubProfile?.githubUsername ?? null;
-  const walletAddress = web3Profile?.solanaAddress ?? null;
-
-  const useGithubCache = !!(
-  githubProfile?.lastSyncAt &&
-  githubProfile.lastSyncAt.getTime() > Date.now() - 86_400_000
-);
-
-  const mode =
-    githubUsername && walletAddress
-      ? 'github+wallet'
-      : walletAddress
-      ? 'wallet-only'
-      : 'github-only';
-
-  return {
-    githubUsername,
-    walletAddress,
-    useGithubCache,
-    mode,
-  };
-}
 
   private async processAnalysisInlineForE2E(input: {
     jobId: string;
@@ -376,7 +375,9 @@ private async resolveInputFromUser(userId: string):Promise<{
       let web3Data: any = null;
 
       if (input.mode === 'wallet-only') {
-        web3Data = await this.solanaAdapter.fetchOnChainData(input.walletAddress!);
+        web3Data = await this.solanaAdapter.fetchOnChainData(
+          input.walletAddress!,
+        );
         let result: any = {
           capabilities: {
             backend: { score: 0, confidence: 'low' },
@@ -428,7 +429,9 @@ private async resolveInputFromUser(userId: string):Promise<{
       }
 
       if (input.mode === 'github+wallet') {
-        web3Data = await this.solanaAdapter.fetchOnChainData(input.walletAddress!);
+        web3Data = await this.solanaAdapter.fetchOnChainData(
+          input.walletAddress!,
+        );
       }
 
       if (!rawData) {
@@ -642,41 +645,41 @@ private async resolveInputFromUser(userId: string):Promise<{
     }
 
     const job = await this.prisma.analysisJob.findUnique({
-    where: { id: jobId },
-  });
+      where: { id: jobId },
+    });
 
-  if (!job) {
-    throw new NotFoundException(`Job ${jobId} not found`);
-  }
+    if (!job) {
+      throw new NotFoundException(`Job ${jobId} not found`);
+    }
 
-  let progress = 0;
-  let stage = 'queued';
+    let progress = 0;
+    let stage = 'queued';
 
-  if (job.status === 'processing') {
-    stage = 'analyzing_projects'; // you can refine later
-    progress = 50; // placeholder unless you persist progress
-  }
+    if (job.status === 'processing') {
+      stage = 'analyzing_projects'; // you can refine later
+      progress = 50; // placeholder unless you persist progress
+    }
 
-  if (job.status === 'completed') {
-    stage = 'complete';
-    progress = 100;
-  }
+    if (job.status === 'completed') {
+      stage = 'complete';
+      progress = 100;
+    }
 
-  if (job.status === 'failed') {
-    stage = 'failed';
-  }
+    if (job.status === 'failed') {
+      stage = 'failed';
+    }
 
-  return {
-    status:
-      job.status === 'completed'
-        ? 'complete'
-        : job.status === 'failed'
-        ? 'failed'
-        : 'pending',
-    stage,
-    progress,
-    failureReason: job.error ?? undefined,
-  };
+    return {
+      status:
+        job.status === 'completed'
+          ? 'complete'
+          : job.status === 'failed'
+            ? 'failed'
+            : 'pending',
+      stage,
+      progress,
+      failureReason: job.error ?? undefined,
+    };
   }
 
   @Get(':jobId/result')
@@ -708,34 +711,34 @@ private async resolveInputFromUser(userId: string):Promise<{
     }
 
     const job = await this.prisma.analysisJob.findUnique({
-    where: { id: jobId },
-  });
+      where: { id: jobId },
+    });
 
-  if (!job) {
-    throw new NotFoundException(`Job ${jobId} not found`);
-  }
+    if (!job) {
+      throw new NotFoundException(`Job ${jobId} not found`);
+    }
 
-  if (job.status === 'completed') {
+    if (job.status === 'completed') {
+      return {
+        status: 'completed',
+        progress: 100,
+        result: job.result,
+      };
+    }
+
+    if (job.status === 'failed') {
+      return {
+        status: 'failed',
+        progress: 0,
+        error: job.error,
+      };
+    }
+
     return {
-      status: 'completed',
-      progress: 100,
-      result: job.result,
-    };
-  }
-
-  if (job.status === 'failed') {
-    return {
-      status: 'failed',
+      status: 'pending',
       progress: 0,
-      error: job.error,
     };
   }
-
-  return {
-    status: 'pending',
-    progress: 0,
-  };
-}
 
   private parseProgress(progress: any): number {
     if (typeof progress === 'number') return progress;

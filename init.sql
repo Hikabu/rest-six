@@ -1,1 +1,1 @@
-CREATE DATABASE 16signals_test;
+CREATE DATABASE signalsSix_test;

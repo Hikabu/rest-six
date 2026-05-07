@@ -21,14 +21,15 @@ import { ProfileResolverModule } from '../profile-candidate/profile-resolver.mod
 @Global()
 @Module({
   imports: [
-	ConfigModule,
+    ConfigModule,
     PrismaModule,
     RedisModule,
     GapAnalysisModule,
     DecisionCardModule,
-		ProfileResolverModule,
-	
-    BullModule.registerQueue({ name: 'signal-compute' }),
+    ProfileResolverModule,
+    ...(process.env.NODE_ENV === 'test'
+      ? []
+      : [BullModule.registerQueue({ name: 'signal-compute' })]),
   ],
   providers: [
     GithubAdapterService,
@@ -48,7 +49,7 @@ import { ProfileResolverModule } from '../profile-candidate/profile-resolver.mod
     ScoringService,
     SolanaAdapterService,
     Web3MergeService,
-    BullModule,
+    ...(process.env.NODE_ENV === 'test' ? [] : [BullModule]),
   ],
 })
 export class ScoringModule {}

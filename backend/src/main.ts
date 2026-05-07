@@ -1,73 +1,91 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 import { ZodValidationPipe } from 'nestjs-zod';
 import cookieParser from 'cookie-parser';
+import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
+
+const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger:
+      process.env.NODE_ENV === 'production'
+        ? ['log', 'error', 'warn']
+        : ['log', 'error', 'warn', 'debug'],
+  });
 
+  app.set('trust proxy', 1);
+  app.enableShutdownHooks();
   app.use(cookieParser());
-  // Security
   app.use(helmet());
+
+  const corsOrigins = (
+    process.env.CORS_ORIGINS ||
+    process.env.FRONTEND_URL ||
+    ''
+  )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: true,
+    origin: corsOrigins.length > 0 ? corsOrigins : false,
     credentials: true,
   });
 
-  app.useGlobalPipes(new ZodValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+    new ZodValidationPipe(),
+  );
+  app.useGlobalFilters(new HttpExceptionFilter());
 
-//   app.useGlobalPipes(
-//   new ValidationPipe({
-//     whitelist: true,
-//     transform: true,
-//   }),
-// );
-
-  app.useStaticAssets(join(__dirname, 'static'), {
-    prefix: '/',
-  });
-
-  // Swagger Documentation
   const config = new DocumentBuilder()
     .setTitle('a16zero Employer API')
     .setDescription(
       'Backend MVP for Employer platform features and Account Abstraction auth verification.',
     )
     .setVersion('1.0')
-  .addBearerAuth()	  
-  .addApiKey(
-    {
-      type: 'apiKey',
-      name: 'x-internal-api-key', // must match your guard
-      in: 'header',
-      description: 'Internal API key',
-    },
-    'internal-api-key',
-  )
+    .addBearerAuth()
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'x-internal-key',
+        in: 'header',
+        description: 'Internal API key',
+      },
+      'internal-api-key',
+    )
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  const cleanedDocument = cleanupOpenApiDoc(document);
-  SwaggerModule.setup('api/docs', app, cleanedDocument, {
-    swaggerOptions: {
-      requestSnippetsEnabled: true,
-    },
-  });
+  if (process.env.NODE_ENV !== 'production') {
+    const document = SwaggerModule.createDocument(app, config);
+    const cleanedDocument = cleanupOpenApiDoc(document);
+    SwaggerModule.setup('api/docs', app, cleanedDocument, {
+      swaggerOptions: {
+        requestSnippetsEnabled: true,
+      },
+    });
+  }
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 8080;
   await app.listen(port);
 
-
-  logger.log(`Application is running on: http://localhost:${port}`);
-  logger.log(`Swagger documentation: http://localhost:${port}/api/docs`);
+  logger.log(`Application is listening on port ${port}`);
+  if (process.env.NODE_ENV !== 'production') {
+    logger.log(`Swagger documentation enabled at /api/docs`);
+  }
 }
 
-console.log('🚨 MAIN APP STARTED');
-bootstrap();
+bootstrap().catch((err) => {
+  logger.error('Application failed to start', err);
+  process.exit(1);
+});

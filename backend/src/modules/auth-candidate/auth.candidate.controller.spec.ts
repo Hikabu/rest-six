@@ -27,7 +27,8 @@ describe('AuthCandidateController', () => {
 
   const mockConfigService = {
     get: jest.fn((key) => {
-      if (key === 'app.url') return 'http://localhost:3000';
+      if (key === 'app.url') return 'https://api.example.test';
+      if (key === 'app.frontendUrl') return 'https://app.example.test';
       if (key === 'auth.githubLinkCallback')
         return '/auth/github/link/callback';
       if (key === 'github.clientID') return 'client_id';
@@ -63,12 +64,12 @@ describe('AuthCandidateController', () => {
     it('should generate secure state for link and redirect', async () => {
       const req = { user: { id: 'user_1' } };
       const res = { redirect: jest.fn() } as any;
-      mockAuthService.githubLink.mockResolvedValue('http://github.auth.url');
+      mockAuthService.githubLink.mockResolvedValue('https://github.auth.url');
 
       await controller.linkGithub(req, res);
 
       expect(mockAuthService.githubLink).toHaveBeenCalledWith('user_1');
-      expect(res.redirect).toHaveBeenCalledWith('http://github.auth.url');
+      expect(res.redirect).toHaveBeenCalledWith('https://github.auth.url');
     });
 
     it('should verify state in callback', async () => {

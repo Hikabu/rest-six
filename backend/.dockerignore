@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+.git
+.gitignore
+.DS_Store
+.env
+.env.*
+!.env.example
+npm-debug.log*
+eslint_report.json
+eslint_residual.json
+test-output*.txt
+test-results*.json
+test-results*.txt

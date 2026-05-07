@@ -20,7 +20,6 @@ export class BaseController {
     message?: string,
     meta?: any,
   ): ApiSuccessResponse<T> {
-    console.log("done");
     return {
       success: true,
       message,

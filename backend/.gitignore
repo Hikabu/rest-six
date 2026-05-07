@@ -11,6 +11,7 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+*.tsbuildinfo
 
 # OS
 .DS_Store
@@ -37,6 +38,7 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
+backend/.env.docker
 .env.docker
 .env.development.local
 .env.test.local
@@ -44,7 +46,6 @@ lerna-debug.log*
 .env.local
 frontend/.env*
 !frontend/.env.example
-!backend/.env.example.docker
 !backend/.env.example
 
 # temp directory
@@ -77,6 +78,7 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+*.tsbuildinfo
 
 # OS
 .DS_Store

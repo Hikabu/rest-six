@@ -1,18 +1,44 @@
-import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
+import { INestApplicationContext } from '@nestjs/common';
 import { WorkerModule } from './queues/worker.module';
 
+const logger = new Logger('Worker');
+
 async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(WorkerModule);
-  console.log('Worker is running...');
+  const app = await NestFactory.createApplicationContext(WorkerModule, {
+    logger:
+      process.env.NODE_ENV === 'production'
+        ? ['log', 'error', 'warn']
+        : ['log', 'error', 'warn', 'debug'],
+  });
+  app.enableShutdownHooks();
+  registerShutdown(app);
+  logger.log('Worker is running');
+}
+
+function registerShutdown(app: INestApplicationContext) {
+  const shutdown = async (signal: string) => {
+    logger.log(`Received ${signal}; shutting down worker`);
+    await app.close();
+    process.exit(0);
+  };
+
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+  process.once('SIGINT', () => void shutdown('SIGINT'));
 }
 
 process.on('unhandledRejection', (err) => {
-  console.error('UNHANDLED REJECTION:', err);
+  logger.error('Unhandled rejection', err);
+  process.exitCode = 1;
 });
 
 process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION:', err);
+  logger.error('Uncaught exception', err);
+  process.exit(1);
 });
 
-bootstrap();
+bootstrap().catch((err) => {
+  logger.error('Worker failed to start', err);
+  process.exit(1);
+});

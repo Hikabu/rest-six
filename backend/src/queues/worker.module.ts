@@ -9,9 +9,11 @@ import { CacheModule } from '../modules/scoring/cache/cache.module';
 import { GithubAdapterModule } from '../modules/scoring/github-adapter/github-adapter.module';
 import { QueuesModule } from './queues.module';
 import { EmailModule } from '../modules/email/email.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule } from '../shared/config/config.module';
+
 @Module({
   imports: [
+    ConfigModule,
     QueuesModule,
     PrismaModule,
     ScoringModule,
@@ -19,9 +21,6 @@ import { ConfigModule } from '@nestjs/config';
     GithubAdapterModule,
     CacheModule,
     EmailModule,
-    ConfigModule.forRoot({
-		isGlobal: true,
-	})
   ],
   providers: [SignalComputeProcessor, EmailProcessor, GithubSyncProcessor],
 })

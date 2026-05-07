@@ -1,0 +1,170 @@
+name: Deploy backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  NODE_VERSION: "20"
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: asia-southeast1
+  SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+  ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY }}
+  IMAGE_NAME: backend
+  CLOUD_SQL_CONNECTION_NAME: ${{ vars.CLOUD_SQL_CONNECTION_NAME }}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: "8080"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/signalsSix_test?schema=public&connection_limit=5
+      SERVER_URL: http://localhost:8080
+      FRONTEND_URL: http://localhost:3001
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-jwt-secret-with-at-least-thirty-two-chars
+      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-thirty-two-chars
+      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-thirty-two-chars
+      JWT_MFA_SECRET: ci-mfa-secret-with-at-least-thirty-two-chars
+      JWT_ONBOARDING_SECRET: ci-onboarding-secret-with-at-least-thirty-two-chars
+      JWT_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 7d
+      JWT_ISSUER: colosseum-api
+      JWT_AUDIENCE: colosseum-client
+      AUTH_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      PRIVY_APP_ID: ci-privy-app
+      PRIVY_SECRET: ci-privy-secret
+      PRIVY_JWKS_URL: https://auth.privy.io/api/v1/apps/ci-privy-app/jwks.json
+      PRIVY_BYPASS: "true"
+      GITHUB_CLIENT_ID: ci-github-client-id
+      GITHUB_CLIENT_SECRET: ci-github-client-secret
+      GITHUB_SYSTEM_TOKEN: ci-github-system-token
+      GOOGLE_CLIENT_ID: ci-google-client-id
+      GOOGLE_CLIENT_SECRET: ci-google-client-secret
+      INTERNAL_API_KEY: ci-internal-api-key
+      HELIUS_WEBHOOK_SECRET: ci-helius-webhook-secret
+      WALLET_CHALLENGE_SECRET: ci-wallet-challenge-secret
+      GOOGLE_AI_API_KEY: ci-google-ai-api-key
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: a16zero_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d a16zero_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-bookworm
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm test
+      - run: npm run test:e2e
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npx prisma generate
+      - run: npm run lint:deploy
+
+  build-and-push:
+    name: Build and push
+    runs-on: ubuntu-latest
+    needs:
+      - test
+      - lint
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Configure Docker
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+      - id: image
+        name: Build image
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/${IMAGE_NAME}:${GITHUB_SHA}"
+          docker build -f backend/Dockerfile -t "${IMAGE}" backend
+          echo "image=${IMAGE}" >> "${GITHUB_OUTPUT}"
+      - name: Push image
+        run: docker push "${{ steps.image.outputs.image }}"
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${SERVICE}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="${{ needs.build-and-push.outputs.image }}" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=8080 \
+            --cpu=1 \
+            --memory=1Gi \
+            --min-instances=0 \
+            --max-instances=10 \
+            --concurrency=80 \
+            --timeout=600 \
+            --add-cloudsql-instances="${CLOUD_SQL_CONNECTION_NAME}" \
+            --set-env-vars="NODE_ENV=production,PORT=8080,SERVER_URL=${{ vars.SERVER_URL }},FRONTEND_URL=${{ vars.FRONTEND_URL }},CORS_ORIGINS=${{ vars.CORS_ORIGINS }},JWT_EXPIRY=${{ vars.JWT_EXPIRY }},JWT_REFRESH_EXPIRY=${{ vars.JWT_REFRESH_EXPIRY }},JWT_ISSUER=${{ vars.JWT_ISSUER }},JWT_AUDIENCE=${{ vars.JWT_AUDIENCE }},PRIVY_JWKS_URL=${{ vars.PRIVY_JWKS_URL }},SOLANA_DEVNET_RPC_URL=${{ vars.SOLANA_DEVNET_RPC_URL }},USING_DEVNET=${{ vars.USING_DEVNET }},RESEND_FROM=${{ vars.RESEND_FROM }},APP_BASE_URL=${{ vars.APP_BASE_URL }},VOUCH_ICON_URL=${{ vars.VOUCH_ICON_URL }},CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION_NAME}" \
+            --set-secrets="DATABASE_URL=DATABASE_URL:latest,REDIS_URL=REDIS_URL:latest,GITHUB_APP_ID=GITHUB_APP_ID:latest,GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest,GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest,GITHUB_PRIVATE_KEY=GITHUB_PRIVATE_KEY:latest,GITHUB_SYSTEM_TOKEN=GITHUB_SYSTEM_TOKEN:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,JWT_SECRET=JWT_SECRET:latest,JWT_ACCESS_SECRET=JWT_ACCESS_SECRET:latest,JWT_REFRESH_SECRET=JWT_REFRESH_SECRET:latest,JWT_MFA_SECRET=JWT_MFA_SECRET:latest,JWT_ONBOARDING_SECRET=JWT_ONBOARDING_SECRET:latest,AUTH_ENCRYPTION_KEY=AUTH_ENCRYPTION_KEY:latest,PRIVY_APP_ID=PRIVY_APP_ID:latest,PRIVY_SECRET=PRIVY_SECRET:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest,HELIUS_API_KEY=HELIUS_API_KEY:latest,HELIUS_WEBHOOK_SECRET=HELIUS_WEBHOOK_SECRET:latest,WALLET_CHALLENGE_SECRET=WALLET_CHALLENGE_SECRET:latest,SOLANA_RPC_URL=SOLANA_RPC_URL:latest,RESEND_API_KEY=RESEND_API_KEY:latest,SENTRY_DSN=SENTRY_DSN:latest,GOOGLE_AI_API_KEY=GOOGLE_AI_API_KEY:latest,RPC_URL=RPC_URL:latest,ALCHEMY_API_KEY=ALCHEMY_API_KEY:latest"

@@ -1,4 +1,11 @@
-import { Controller, Post, Body, Headers, UseGuards, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  UseGuards,
+  Res,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -35,6 +42,14 @@ export class AuthEmployerController extends BaseController {
     super();
   }
 
+  private authCookieOptions() {
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+    };
+  }
+
   // ---------------- LOGIN ----------------
 
   @Public()
@@ -51,10 +66,10 @@ export class AuthEmployerController extends BaseController {
       'Optional login metadata used during company creation or update',
     examples: {
       default: {
-        value:{
-  walletAddress: "0x123456789abcdef0123456789abcdef012345678",
-  smartAccountAddress: "0x123456789abcdef0123456789abcdef012345678"
-},
+        value: {
+          walletAddress: '0x123456789abcdef0123456789abcdef012345678',
+          smartAccountAddress: '0x123456789abcdef0123456789abcdef012345678',
+        },
       },
     },
   })
@@ -75,21 +90,18 @@ export class AuthEmployerController extends BaseController {
     @Headers('authorization') authHeader: string,
     @Body() loginDto: LoginDto,
   ) {
-    console.log("LOGIN: authHeader:", authHeader, "loginDto:", loginDto);
     if (!authHeader) {
       throw new AppException('No authorization header found', 401);
     }
     const token = authHeader.replace('Bearer ', '');
 
     const result = await this.authService.login(token, loginDto);
-    console.log("Login result: ", result);
-    res.cookie('access_token', result.accessToken, { httpOnly: true });
-    console.log("set cookie with access token");
+    res.cookie('access_token', result.accessToken, this.authCookieOptions());
     return res.json({
-    success: true,
-    message: 'Logged in successfully',
-    data: result,
-  });
+      success: true,
+      message: 'Logged in successfully',
+      data: result,
+    });
   }
 
   @Post('logout')
@@ -103,9 +115,9 @@ export class AuthEmployerController extends BaseController {
     res.clearCookie('access_token');
     res.clearCookie('refresh_token');
     return res.json({
-    success: true,
-    message: 'Logged out successfully',
-    data: null,
-  });
+      success: true,
+      message: 'Logged out successfully',
+      data: null,
+    });
   }
 }

@@ -2,23 +2,31 @@ import { Module } from '@nestjs/common';
 import { AuthCandidateService } from './auth.candidate.service';
 import { AuthCandidateController } from './auth.candidate.controller';
 import { GithubStrategy } from './strategies/github.strategy';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshStrategy } from './strategies/refresh.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GithubLinkGuard } from './guards/github.link.guard';
 import { GoogleLinkGuard } from './guards/google.link.guard';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import authConfig from './auth.candidate.config';
 import { GithubLinkStrategy } from './strategies/github.link.strategy';
 import { GoogleLinkStrategy } from './strategies/google.link.strategy';
 import { GithubSyncConnectStrategy } from './strategies/github.sync.connect.strategy';
 
+const githubAuthProviders =
+  process.env.GITHUB_AUTH_ENABLED === 'true'
+    ? [GithubStrategy, GithubLinkStrategy, GithubSyncConnectStrategy]
+    : [];
+
 @Module({
   imports: [
-    JwtModule.register({
-      secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '15m' },
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): JwtModuleOptions => ({
+        secret: config.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '15m' },
+      }),
     }),
     ConfigModule.forRoot({
       isGlobal: true,
@@ -28,16 +36,13 @@ import { GithubSyncConnectStrategy } from './strategies/github.sync.connect.stra
   controllers: [AuthCandidateController],
   providers: [
     AuthCandidateService,
-    GithubStrategy,
     GoogleStrategy,
-    GithubLinkStrategy,
     GoogleLinkStrategy,
-    GithubSyncConnectStrategy,
+    ...githubAuthProviders,
     JwtStrategy,
     RefreshStrategy,
     GithubLinkGuard,
     GoogleLinkGuard,
-    RefreshStrategy,
   ],
 })
 export class AuthCandidateModule {}

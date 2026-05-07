@@ -7,21 +7,27 @@ import { Octokit } from 'octokit';
 @Injectable()
 export class OctokitFactory {
   private readonly logger = new Logger(OctokitFactory.name);
+  private readonly githubAuthEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
+    this.githubAuthEnabled =
+      this.config.get<string>('GITHUB_AUTH_ENABLED') === 'true';
     const systemToken = this.config.get<string>('GITHUB_SYSTEM_TOKEN');
-    if (!systemToken) {
+    if (this.githubAuthEnabled && !systemToken) {
       throw new Error(
         'GITHUB_SYSTEM_TOKEN is not set. ' +
-          'Set it in .env. Without it all GitHub requests are unauthenticated (60 req/hr).',
+          'Set it in .env or disable GitHub auth with GITHUB_AUTH_ENABLED=false.',
       );
     }
 
     this.logger.log(
-      { tokenLength: systemToken.length },
+      {
+        githubAuthEnabled: this.githubAuthEnabled,
+        tokenLength: systemToken?.length ?? 0,
+      },
       'octokit_factory_ready',
     );
   }

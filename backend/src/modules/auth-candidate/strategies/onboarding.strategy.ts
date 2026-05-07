@@ -11,10 +11,7 @@ export class OnboardingStrategy extends PassportStrategy(
   constructor(private config: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (req) => {
-			 console.log('cookies:', req?.cookies);
-			req?.cookies?.temp_auth;
-		},
+        (req) => req?.cookies?.temp_auth,
         (req) => req?.headers?.authorization?.split(' ')[1],
       ]),
       secretOrKey: config.get('jwt_secret.onboarding'),
