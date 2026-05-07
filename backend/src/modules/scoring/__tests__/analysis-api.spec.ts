@@ -14,10 +14,10 @@ describe('AnalysisController (integration)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let signalQueueMock: any;
-  const internalKey = 'test-internal-key';
+  let internalKey: string;
 
   beforeAll(async () => {
-    process.env.INTERNAL_API_KEY = internalKey;
+    process.env.INTERNAL_API_KEY ??= 'test-internal-key';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -34,6 +34,7 @@ describe('AnalysisController (integration)', () => {
 
     prisma = app.get<PrismaService>(PrismaService);
     signalQueueMock = app.get(getQueueToken('signal-compute'));
+    internalKey = app.get(ConfigService).getOrThrow<string>('INTERNAL_API_KEY');
   });
 
   afterEach(async () => {
