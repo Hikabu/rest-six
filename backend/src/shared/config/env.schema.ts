@@ -49,6 +49,9 @@ export const envSchema = z.object({
   SENTRY_DSN: z.string().optional(),
 
   GOOGLE_AI_API_KEY: z.string().optional(),
+
+  RECLAIM_APP_ID: z.string().optional(),
+  RECLAIM_APP_SECRET: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);
