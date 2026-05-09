@@ -115,8 +115,9 @@ describe('AuthCandidateService', () => {
         3600,
       );
       expect(result).toEqual({
-        type: 'NEEDS_VERIFICATION',
-        data: { email: 'test@example.com' },
+        success: true,
+        message:
+          'If an account can be created with these details, you will receive a verification email.',
       });
     });
     it('should login and check MFA requirement', async () => {

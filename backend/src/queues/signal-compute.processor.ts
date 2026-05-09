@@ -110,6 +110,8 @@ export class SignalComputeProcessor extends WorkerHost {
             confidence: 'low',
           },
           reputation: null,
+          organizations: [],
+          interactionProfile: null,
           stack: { languages: [], tools: [] },
           summary:
             'On-chain developer profile. Insufficient public GitHub data to assess software capabilities.',

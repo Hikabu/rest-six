@@ -102,7 +102,7 @@ export class ScorecardService {
           username: 'candidate',
           avatarUrl: undefined,
           primaryCohort: 'unknown',
-          seniority: 'MID',
+          seniority: 'MID' as any,
           summary: 'Reviewing developer history...',
         },
         score: {
@@ -111,8 +111,8 @@ export class ScorecardService {
           isWithheld: { value: false },
         },
         trust: {
-          level: 'PARTIAL',
-          risk: 'LOW_RISK',
+          level: 'PARTIAL' as any,
+          risk: 'LOW_RISK' as any,
           label: 'NEUTRAL',
           guidance: 'Awaiting updated scoring analysis.',
         },
@@ -132,6 +132,11 @@ export class ScorecardService {
             externalContributions: 0,
             confidence: 'low',
           },
+          reputation: null,
+          organizations: [],
+          interactionProfile: null,
+          stack: { languages: [], tools: [] },
+          web3: null,
         },
       };
     }
@@ -149,7 +154,7 @@ export class ScorecardService {
         username: 'unknown',
         avatarUrl: undefined,
         primaryCohort: 'unknown',
-        seniority: 'MID',
+        seniority: 'MID' as any,
         summary: real.summary,
       },
       score: {
@@ -159,7 +164,7 @@ export class ScorecardService {
       },
       trust: {
         level: this.mapConfidenceLevel(real),
-        risk: 'LOW_RISK',
+        risk: 'LOW_RISK' as any,
         label: this.mapTrustLabel(real),
         guidance: this.mapGuidance(real),
       },
@@ -170,6 +175,12 @@ export class ScorecardService {
         caveats: [],
         ownership: real.ownership,
         impact: real.impact,
+        reputation: real.reputation ?? null,
+        privateWorkNote: real.privateWorkNote,
+        organizations: real.organizations ?? [],
+        interactionProfile: real.interactionProfile ?? null,
+        stack: real.stack ?? { languages: [], tools: [] },
+        web3: real.web3 ?? null,
       },
     };
   }
@@ -277,37 +288,28 @@ export class ScorecardService {
 
   private buildPlaceholderResult(): ScorecardResult {
     return {
-      snapshot: {
-        seniority: 'MID',
-        summary: 'Placeholder summary.',
-        riskLevel: 'LOW_RISK',
-        generatedAt: new Date(),
+      summary: 'Reviewing developer history...',
+      capabilities: {
+        backend: { score: 0, confidence: 'low' },
+        frontend: { score: 0, confidence: 'low' },
+        devops: { score: 0, confidence: 'low' },
       },
-      timeline: {
-        phases: [],
-        trajectory: 'STABLE',
-        generatedAt: new Date(),
+      ownership: {
+        ownedProjects: 0,
+        activelyMaintained: 0,
+        confidence: 'low',
       },
-      signals: {} as any,
-      claims: [],
-      confidenceEnvelope: {
-        overallConfidence: 0,
-        confidenceTier: 'LOW',
-        riskLevel: 'LOW_RISK',
-        caveats: [],
-        scoreWithheld: false,
+      impact: {
+        activityLevel: 'low',
+        consistency: 'sparse',
+        externalContributions: 0,
+        confidence: 'low',
       },
-      percentile: {
-        ecosystemPercentile: 0,
-        ecosystemPercentileLabel: '',
-        crossEcosystemPercentile: 0,
-        cohortSize: 0,
-      },
-      behaviorClassification: {
-        primaryPattern: 'BALANCED_CONTRIBUTOR',
-        primaryConfidence: 0,
-        secondaryPattern: null,
-      },
+      reputation: null,
+      organizations: [],
+      interactionProfile: null,
+      stack: { languages: [], tools: [] },
+      web3: null,
     };
   }
 }

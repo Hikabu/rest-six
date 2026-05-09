@@ -14,9 +14,8 @@ import {
   ApiOkResponse,
   ApiUnauthorizedResponse,
   ApiBadRequestResponse,
-  ApiHeader,
 } from '@nestjs/swagger';
-import { Response } from 'express';
+import { CookieOptions, Response } from 'express';
 
 import { AuthEmployerService } from './auth.employer.service';
 import { LoginDto } from './dto/login.dto';
@@ -42,13 +41,11 @@ export class AuthEmployerController extends BaseController {
     super();
   }
 
-  private authCookieOptions() {
-    return {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
-    };
-  }
+  private readonly authCookieOptions: CookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  };
 
   // ---------------- LOGIN ----------------
 
@@ -96,7 +93,7 @@ export class AuthEmployerController extends BaseController {
     const token = authHeader.replace('Bearer ', '');
 
     const result = await this.authService.login(token, loginDto);
-    res.cookie('access_token', result.accessToken, this.authCookieOptions());
+    res.cookie('access_token', result.accessToken, this.authCookieOptions);
     return res.json({
       success: true,
       message: 'Logged in successfully',

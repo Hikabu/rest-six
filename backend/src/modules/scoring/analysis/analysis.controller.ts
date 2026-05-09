@@ -14,8 +14,10 @@ import {
   ValidationPipe,
   UnauthorizedException,
   InternalServerErrorException,
+  Inject,
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import Redis from 'ioredis';
 import { InjectQueue } from '@nestjs/bullmq';
 import { CacheService } from '../cache/cache.service';
 import { InternalKeyGuard } from '../../scorecard/internal-key.guard';
@@ -65,6 +67,7 @@ export class AnalysisController {
     private readonly signalExtractor: SignalExtractorService,
     private readonly scoringService: ScoringService,
     private readonly web3MergeService: Web3MergeService,
+    @Inject('REDIS') private readonly redis: Redis,
   ) {}
 
   @Post()
@@ -195,6 +198,10 @@ Optional if authenticated.
         useGithubCache,
       });
     } else {
+      const delay = await this.getSystemTokenQueueDelay(
+        req.user?.id ?? null,
+        Boolean(githubUsername),
+      );
       await this.signalQueue.add(
         'analyze',
         {
@@ -205,7 +212,7 @@ Optional if authenticated.
           useGithubCache,
           userId: req.user?.id ?? null,
         },
-        { attempts: 1 },
+        { attempts: 1, ...(delay > 0 ? { delay } : {}) },
       );
     }
 
@@ -292,14 +299,22 @@ Use this for admin/system reprocessing.
         useGithubCache: input.useGithubCache,
       });
     } else {
-      await this.signalQueue.add('analyze', {
-        jobId: jobRecord.id,
-        githubUsername: input.githubUsername,
-        walletAddress: input.walletAddress,
-        mode: input.mode,
-        useGithubCache: input.useGithubCache,
+      const delay = await this.getSystemTokenQueueDelay(
         userId,
-      });
+        Boolean(input.githubUsername),
+      );
+      await this.signalQueue.add(
+        'analyze',
+        {
+          jobId: jobRecord.id,
+          githubUsername: input.githubUsername,
+          walletAddress: input.walletAddress,
+          mode: input.mode,
+          useGithubCache: input.useGithubCache,
+          userId,
+        },
+        delay > 0 ? { delay } : undefined,
+      );
     }
 
     return { jobId: jobRecord.id };
@@ -346,6 +361,45 @@ Use this for admin/system reprocessing.
       useGithubCache,
       mode,
     };
+  }
+
+  private async getSystemTokenQueueDelay(
+    userId: string | null,
+    hasGithubUsername: boolean,
+  ): Promise<number> {
+    if (!hasGithubUsername) {
+      return 0;
+    }
+
+    if (userId) {
+      const profile = await this.prisma.githubProfile.findUnique({
+        where: { userId },
+        select: { encryptedToken: true },
+      });
+
+      if (profile?.encryptedToken) {
+        return 0;
+      }
+    }
+
+    const counter = await this.redis.get(this.getCurrentSystemRateLimitKey());
+    if (Number(counter ?? 0) > 4800) {
+      return 30_000;
+    }
+
+    return 0;
+  }
+
+  private getCurrentSystemRateLimitKey(): string {
+    const now = new Date();
+    return (
+      'ratelimit:github:system:' +
+      `${now.getUTCFullYear()}` +
+      `${String(now.getUTCMonth() + 1).padStart(2, '0')}` +
+      `${String(now.getUTCDate()).padStart(2, '0')}` +
+      `${String(now.getUTCHours()).padStart(2, '0')}` +
+      `${String(now.getUTCMinutes()).padStart(2, '0')}`
+    );
   }
 
   private async processAnalysisInlineForE2E(input: {
@@ -396,6 +450,8 @@ Use this for admin/system reprocessing.
             confidence: 'low',
           },
           reputation: null,
+          organizations: [],
+          interactionProfile: null,
           stack: { languages: [], tools: [] },
           summary:
             'On-chain developer profile. Insufficient public GitHub data to assess software capabilities.',
@@ -607,11 +663,11 @@ Use this for admin/system reprocessing.
           githubUsername: input.githubUsername,
           walletAddress: input.walletAddress,
         } as any,
-        result: result,
+        result: result as any,
       },
       update: {
         status: 'completed',
-        result: result,
+        result: result as any,
       },
     });
   }

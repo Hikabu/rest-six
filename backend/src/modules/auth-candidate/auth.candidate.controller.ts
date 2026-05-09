@@ -8,7 +8,7 @@ import {
   UseGuards,
   Query,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { CookieOptions, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AuthCandidateService } from './auth.candidate.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -52,28 +52,14 @@ export class AuthCandidateController {
     private readonly config: ConfigService,
   ) {}
 
-  private frontendUrl() {
-    return this.config.get<string>('app.frontendUrl');
-  }
+  private readonly authCookieOptions: CookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  };
 
-  private redirectOrJson(
-    res: Response,
-    path: string,
-    fallbackBody: Record<string, unknown>,
-  ) {
-    const frontendUrl = this.frontendUrl();
-    if (!frontendUrl) {
-      return res.status(200).json(fallbackBody);
-    }
-    return res.redirect(new URL(path, frontendUrl).toString());
-  }
-
-  private authCookieOptions() {
-    return {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
-    };
+  private getFrontendUrl() {
+    return this.config.get<string>('FRONTEND_URL') || '';
   }
 
   private handleAuthResponse(
@@ -86,42 +72,29 @@ export class AuthCandidateController {
         res.cookie(
           'access_token',
           result.data.accessToken,
-          this.authCookieOptions(),
+          this.authCookieOptions,
         );
-        res.cookie('refresh_token', result.data.refreshToken, {
-          ...this.authCookieOptions(),
-        });
+        res.cookie(
+          'refresh_token',
+          result.data.refreshToken,
+          this.authCookieOptions,
+        );
         return res.status(200).json({ success: true });
       }
 
       case AuthState.NEEDS_VERIFICATION:
-        return this.redirectOrJson(
-          res,
-          `/verify?email=${encodeURIComponent(result.data.email)}`,
-          { success: false, state: result.type, email: result.data.email },
+        return res.redirect(
+          `${this.getFrontendUrl()}/verify?email=${encodeURIComponent(result.data.email)}`,
         );
 
       case AuthState.MFA_REQUIRED:
-        return this.redirectOrJson(
-          res,
-          `/mfa?token=${encodeURIComponent(result.data.mfaToken)}`,
-          {
-            success: false,
-            state: result.type,
-            mfaToken: result.data.mfaToken,
-          },
+        return res.redirect(
+          `${this.getFrontendUrl()}/mfa?token=${encodeURIComponent(result.data.mfaToken)}`,
         );
 
       case AuthState.NEEDS_ONBOARDING:
-        res.cookie(
-          'temp_auth',
-          result.data.tempToken,
-          this.authCookieOptions(),
-        );
-        return this.redirectOrJson(res, '/onboarding', {
-          success: false,
-          state: result.type,
-        });
+        res.cookie('temp_auth', result.data.tempToken, this.authCookieOptions);
+        return res.redirect(`${this.getFrontendUrl()}/onboarding`);
 
       default:
         return res.status(401).json({ message: 'Invalid auth state' });
@@ -139,7 +112,7 @@ export class AuthCandidateController {
   @ApiBody({ type: RegisterDto })
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     const result = await this.authService.register(dto);
-    return this.handleAuthResponse(res, result);
+    return res.status(202).json(result);
   }
 
   // ---------------- EMAIL VERIFICATION ----------------
@@ -337,6 +310,35 @@ export class AuthCandidateController {
   async refresh(@Req() req: any, @Res() res: Response) {
     const result = await this.authService.refresh(req.user);
     return this.handleAuthResponse(res, result);
+  }
+
+  // ---------------- PASSWORD RESET ----------------
+
+  @Post('password-reset/request')
+  @ApiOperation({
+    summary: 'Request password reset',
+    description:
+      'Starts the password reset flow. Always returns a generic success response.',
+  })
+  @ApiBody({ type: RequestPasswordResetDto })
+  async requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    await this.authService.requestPasswordReset(dto);
+    return {
+      success: true,
+      message:
+        'If an account exists with this email, you will receive a reset link.',
+    };
+  }
+
+  @Post('password-reset/confirm')
+  @ApiOperation({
+    summary: 'Confirm password reset',
+    description: 'Resets the password with a valid password reset token.',
+  })
+  @ApiBody({ type: ResetPasswordDto })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto);
+    return { success: true };
   }
 
   // ---------------- MFA ----------------
