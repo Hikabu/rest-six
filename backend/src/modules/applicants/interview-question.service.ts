@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
 // import { GoogleGenAI } from '@google/generative-ai';
@@ -26,7 +30,7 @@ export class InterviewQuestionService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {
     const apiKey = this.configService.get<string>('GOOGLE_AI_API_KEY');
 
@@ -43,8 +47,8 @@ export class InterviewQuestionService {
         where: { id: appId },
         include: {
           jobPost: true,
-          candidate: { include: { user: true } }
-        }
+          candidate: { include: { user: true } },
+        },
       });
 
       if (!app) return;
@@ -54,7 +58,7 @@ export class InterviewQuestionService {
       // Sort questions by priority
       const priorityOrder = { MUST_ASK: 1, SHOULD_ASK: 2, NICE_TO_HAVE: 3 };
       generatedSet.questions.sort(
-        (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]
+        (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority],
       );
 
       const existingQuestions = (app.interviewQuestions as any[]) || [];
@@ -62,8 +66,8 @@ export class InterviewQuestionService {
       await this.prisma.shortlist.update({
         where: { id: appId },
         data: {
-          interviewQuestions: [...existingQuestions, generatedSet]
-        }
+          interviewQuestions: [...existingQuestions, generatedSet],
+        },
       });
 
       this.logger.log(`Generated and saved questions for ${appId}`);
@@ -72,7 +76,10 @@ export class InterviewQuestionService {
     }
   }
 
-  async generate(application: any, targetStage: PipelineStage): Promise<InterviewQuestionSet> {
+  async generate(
+    application: any,
+    targetStage: PipelineStage,
+  ): Promise<InterviewQuestionSet> {
     let audienceType: 'hr' | 'technical' | 'final';
     let systemPrompt = '';
 
@@ -84,16 +91,31 @@ export class InterviewQuestionService {
       systemPrompt = 'You are preparing a final-round interview.';
     } else {
       audienceType = 'technical';
-      systemPrompt = 'You are a senior engineer conducting a technical interview.';
+      systemPrompt =
+        'You are a senior engineer conducting a technical interview.';
     }
 
-    const { decisionCard = {}, gapReport = {} } = application;
+    const {
+      decisionCard = {},
+      gapReport = {},
+      frozenScorecard = {},
+    } = application;
 
     const payload = JSON.stringify({
       verdict: decisionCard.verdict,
       gaps: gapReport.gaps || [],
       strengths: decisionCard.strengths || [],
       risks: decisionCard.risks || [],
+      scorecard: {
+        summary: frozenScorecard.summary,
+        capabilities: frozenScorecard.capabilities,
+        ownership: frozenScorecard.ownership,
+        impact: frozenScorecard.impact,
+        reputation: frozenScorecard.reputation,
+        privateWorkNote: frozenScorecard.privateWorkNote,
+        stack: frozenScorecard.stack,
+        web3: frozenScorecard.web3,
+      },
     });
 
     const prompt = `
@@ -123,7 +145,7 @@ ${payload}
 
     try {
       const result = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: 'gemini-2.5-flash',
         contents: prompt,
       });
 
@@ -149,7 +171,7 @@ ${payload}
       }
 
       // ✅ Normalize priorities (bulletproof)
-      parsed = parsed.map(q => ({
+      parsed = parsed.map((q) => ({
         ...q,
         priority: this.normalizePriority(q.priority),
       }));
@@ -160,10 +182,11 @@ ${payload}
         questions: parsed,
         generatedAt: new Date(),
       };
-
     } catch (e: any) {
       this.logger.error(`Gemini API error: ${e.message}`);
-      throw new InternalServerErrorException('Failed to generate interview questions.');
+      throw new InternalServerErrorException(
+        'Failed to generate interview questions.',
+      );
     }
   }
 

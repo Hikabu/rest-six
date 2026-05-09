@@ -132,6 +132,11 @@ export class ScorecardService {
             externalContributions: 0,
             confidence: 'low',
           },
+          reputation: null,
+          organizations: [],
+          interactionProfile: null,
+          stack: { languages: [], tools: [] },
+          web3: null,
         },
       };
     }
@@ -170,6 +175,12 @@ export class ScorecardService {
         caveats: [],
         ownership: real.ownership,
         impact: real.impact,
+        reputation: real.reputation ?? null,
+        privateWorkNote: real.privateWorkNote,
+        organizations: real.organizations ?? [],
+        interactionProfile: real.interactionProfile ?? null,
+        stack: real.stack ?? { languages: [], tools: [] },
+        web3: real.web3 ?? null,
       },
     };
   }
@@ -277,37 +288,28 @@ export class ScorecardService {
 
   private buildPlaceholderResult(): ScorecardResult {
     return {
-      snapshot: {
-        seniority: 'MID' as any,
-        summary: 'Placeholder summary.',
-        riskLevel: 'LOW_RISK' as any,
-        generatedAt: new Date(),
-      } as any,
-      timeline: {
-        phases: [],
-        trajectory: 'STABLE',
-        generatedAt: new Date(),
-      } as any,
-      signals: {} as any,
-      claims: [],
-      confidenceEnvelope: {
-        overallConfidence: 0,
-        confidenceTier: 'LOW' as any,
-        riskLevel: 'LOW_RISK' as any,
-        caveats: [],
-        scoreWithheld: false,
+      summary: 'Reviewing developer history...',
+      capabilities: {
+        backend: { score: 0, confidence: 'low' },
+        frontend: { score: 0, confidence: 'low' },
+        devops: { score: 0, confidence: 'low' },
       },
-      percentile: {
-        ecosystemPercentile: 0,
-        ecosystemPercentileLabel: '',
-        crossEcosystemPercentile: 0,
-        cohortSize: 0,
+      ownership: {
+        ownedProjects: 0,
+        activelyMaintained: 0,
+        confidence: 'low',
       },
-      behaviorClassification: {
-        primaryPattern: 'BALANCED_CONTRIBUTOR' as any,
-        primaryConfidence: 0,
-        secondaryPattern: null,
-      } as any,
+      impact: {
+        activityLevel: 'low',
+        consistency: 'sparse',
+        externalContributions: 0,
+        confidence: 'low',
+      },
+      reputation: null,
+      organizations: [],
+      interactionProfile: null,
+      stack: { languages: [], tools: [] },
+      web3: null,
     };
   }
 }

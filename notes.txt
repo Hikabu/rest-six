@@ -10,3 +10,19 @@ Export candidate scorecard (HTML)
 > view simplified for fr vs for cto with in deth ? where is it at?
 
 > skill comparison ??? stage 5
+
+> 3. Profile & syncs >> add password reset 
+
+>  missing analytics
+
+> missing: 
+
+
+GET
+/api/actions/vouch/{username}
+Get Blink Card for vouching
+
+
+POST
+/api/actions/vouch/{username}
+Request vouch transaction

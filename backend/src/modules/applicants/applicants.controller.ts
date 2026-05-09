@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Req, Query, BadRequestException, Res, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  Req,
+  Query,
+  BadRequestException,
+  Res,
+  NotFoundException,
+} from '@nestjs/common';
 import { Response } from 'express';
 import {
   ApiTags,
@@ -40,7 +53,7 @@ export class ApplicantsController extends BaseController {
   ) {
     super();
   }
-   // ─────────────────────────────
+  // ─────────────────────────────
   // CANDIDATE: GAP PREVIEW
   // ─────────────────────────────
 
@@ -49,8 +62,7 @@ export class ApplicantsController extends BaseController {
   @ApiOperation({
     summary: 'Preview gap analysis',
     description:
-      'Returns gap analysis BEFORE applying.\n\n' +
-      'Does not persist data.',
+      'Returns gap analysis BEFORE applying.\n\n' + 'Does not persist data.',
   })
   @ApiQuery({
     name: 'jobId',
@@ -62,11 +74,62 @@ export class ApplicantsController extends BaseController {
     description: 'Missing jobId',
     type: ErrorResponseDto,
   })
+  @ApiOkResponse({
+    description:
+      'Gap preview with updated scorecard, skills gap, and review outcome.',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          jobId: 'job_123',
+          fitTier: 'PROBE',
+          reviewOutcome: 'NEEDS_REVIEW',
+          roleFitScore: 72,
+          gapSummary:
+            'Review-recommended candidate. High backend capability. Missing Rust experience.',
+          matchedTechnologies: ['Solana'],
+          missingTechnologies: ['Rust'],
+          skillsGap: {
+            requiredSkills: ['Rust', 'Solana'],
+            matchedTechnologies: ['Solana'],
+            missingTechnologies: ['Rust'],
+            gaps: [{ skill: 'Rust', severity: 'DEALBREAKER' }],
+          },
+          scorecard: {
+            summary: 'Backend-focused developer with Solana activity.',
+            capabilities: {
+              backend: { score: 0.82, confidence: 'high' },
+              frontend: { score: 0.42, confidence: 'medium' },
+              devops: { score: 0.51, confidence: 'medium' },
+            },
+            ownership: {
+              ownedProjects: 5,
+              activelyMaintained: 3,
+              confidence: 'high',
+            },
+            impact: {
+              activityLevel: 'high',
+              consistency: 'strong',
+              externalContributions: 12,
+              confidence: 'high',
+            },
+            reputation: null,
+            organizations: [],
+            interactionProfile: null,
+            stack: { languages: ['TypeScript'], tools: ['Anchor'] },
+            web3: { ecosystem: 'solana', ecosystemPRs: 2 },
+          },
+        },
+      },
+    },
+  })
   async getGapPreview(@Req() req: any, @Query('jobId') jobId: string) {
     if (!jobId) throw new BadRequestException('jobId is required');
 
-    const preview = await this.applicantsService.getGapPreview(jobId, req.user.id);
-	console.log("preview: ", preview);
+    const preview = await this.applicantsService.getGapPreview(
+      jobId,
+      req.user.id,
+    );
     return this.handleSuccess(preview);
   }
 
@@ -104,10 +167,13 @@ export class ApplicantsController extends BaseController {
   })
   async apply(@Req() req: any, @Param('jobId') jobId: string) {
     const application = await this.applicantsService.apply(jobId, req.user.id);
-    return this.handleCreated(application, 'Application submitted successfully');
+    return this.handleCreated(
+      application,
+      'Application submitted successfully',
+    );
   }
 
-    // ─────────────────────────────
+  // ─────────────────────────────
   // CANDIDATE: MY APPLICATIONS
   // ─────────────────────────────
 
@@ -119,7 +185,9 @@ export class ApplicantsController extends BaseController {
       'Returns candidate applications with human-readable pipeline stages.',
   })
   async getMyApplications(@Req() req: any) {
-    const list = await this.applicantsService.findCandidateApplications(req.user.id);
+    const list = await this.applicantsService.findCandidateApplications(
+      req.user.id,
+    );
     return this.handleSuccess(list);
   }
 
@@ -164,9 +232,13 @@ export class ApplicantsController extends BaseController {
   async getJobApplications(
     @Req() req: any,
     @Param('jobId') jobId: string,
-    @Query() filters: ApplicationFiltersDto
+    @Query() filters: ApplicationFiltersDto,
   ) {
-    const list = await this.applicantsService.findByJob(jobId, req.user.id, filters);
+    const list = await this.applicantsService.findByJob(
+      jobId,
+      req.user.id,
+      filters,
+    );
     return this.handleSuccess(list);
   }
 
@@ -196,18 +268,53 @@ export class ApplicantsController extends BaseController {
         id: 'app_123',
         hrView: {
           verdict: 'PROCEED',
+          reviewOutcome: 'OK',
           hrSummary: 'Strong candidate with clear career growth',
           reputationNote: 'Verified by 5 peers on-chain',
           appliedAt: '2026-04-20T10:00:00Z',
           pipelineStage: 'INTERVIEW_TECHNICAL',
-          candidate: { name: 'Alice Smith', username: 'alice_dev' }
+          candidate: { name: 'Alice Smith', username: 'alice_dev' },
         },
         technicalView: {
-          technicalSummary: 'Expert in React and Node.js. Missing Rust experience.',
+          technicalSummary:
+            'Expert in React and Node.js. Missing Rust experience.',
           strengths: ['Architecture', 'Testing'],
           risks: ['No experience with high-scale DBs'],
           roleFitScore: 85,
-          fitTier: 'STRONG'
+          fitTier: 'STRONG',
+          scorecard: {
+            summary: 'Full-stack developer with strong backend capability.',
+            capabilities: {
+              backend: { score: 0.82, confidence: 'high' },
+              frontend: { score: 0.68, confidence: 'medium' },
+              devops: { score: 0.44, confidence: 'medium' },
+            },
+            ownership: {
+              ownedProjects: 5,
+              activelyMaintained: 3,
+              confidence: 'medium',
+            },
+            impact: {
+              activityLevel: 'high',
+              consistency: 'strong',
+              externalContributions: 12,
+              confidence: 'high',
+            },
+            reputation: null,
+            organizations: [],
+            interactionProfile: null,
+            stack: {
+              languages: ['TypeScript'],
+              tools: ['NestJS', 'PostgreSQL'],
+            },
+            web3: null,
+          },
+          skillsGap: {
+            requiredSkills: ['Rust', 'Solana'],
+            matchedTechnologies: ['Solana'],
+            missingTechnologies: ['Rust'],
+            gaps: [{ skill: 'Rust', severity: 'DEALBREAKER' }],
+          },
         },
         decisionCard: {
           verdict: 'PROCEED',
@@ -216,17 +323,17 @@ export class ApplicantsController extends BaseController {
           gapDetail: {
             overallVerdict: 'PROCEED',
             technologyFitScore: 0.85,
-            gaps: [{ dimension: 'Rust', severity: 'SIGNIFICANT' }]
-          }
+            gaps: [{ dimension: 'Rust', severity: 'SIGNIFICANT' }],
+          },
         },
         interviewQuestions: {
           stage: 'INTERVIEW_TECHNICAL',
-          questions: [{ question: 'Explain X', priority: 'MUST_ASK' }]
+          questions: [{ question: 'Explain X', priority: 'MUST_ASK' }],
         },
         notObservable: ['Communication quality'],
-        pipelineStageHistory: [{ stage: 'APPLIED', movedAt: '...' }]
-      }
-    }
+        pipelineStageHistory: [{ stage: 'APPLIED', movedAt: '...' }],
+      },
+    },
   })
   @ApiNotFoundResponse({
     description: 'Application not found',
@@ -252,12 +359,12 @@ export class ApplicantsController extends BaseController {
   async applyDecision(
     @Req() req: any,
     @Param('appId') appId: string,
-    @Body() body: ApplyDecisionDto
+    @Body() body: ApplyDecisionDto,
   ) {
     const updated = await this.applicantsService.applyDecision(
       appId,
       body.status,
-      req.user.id
+      req.user.id,
     );
     return this.handleSuccess(updated, 'Decision applied successfully');
   }
@@ -276,9 +383,12 @@ export class ApplicantsController extends BaseController {
   async getScorecard(
     @Req() req: any,
     @Param('appId') appId: string,
-    @Res() res: Response
+    @Res() res: Response,
   ) {
-    const application = await this.applicantsService.findRawById(appId, req.user.id);
+    const application = await this.applicantsService.findRawById(
+      appId,
+      req.user.id,
+    );
     if (!application) throw new NotFoundException('Application not found');
 
     const html = this.scorecardRendererService.render(application);
@@ -303,18 +413,17 @@ export class ApplicantsController extends BaseController {
   async advanceApplicationStage(
     @Req() req: any,
     @Param('appId') appId: string,
-    @Body() body: AdvanceStageDto
+    @Body() body: AdvanceStageDto,
   ) {
     const updated = await this.applicantsService.advanceStage(
       appId,
       req.user.id,
       body.stage,
-      body.note
+      body.note,
     );
 
     return this.handleSuccess(updated, 'Pipeline stage advanced');
   }
-
 
   // ─────────────────────────────
   // HR: INTERVIEW QUESTIONS
@@ -326,6 +435,7 @@ export class ApplicantsController extends BaseController {
     summary: 'Get interview questions',
     description:
       'Returns generated interview questions.\n\n' +
+      'Includes the frozen final scorecard and skills gap context used for technical probing.\n\n' +
       'Optional:\n' +
       '- Filter by stage\n' +
       '- Defaults to latest set',
@@ -336,30 +446,71 @@ export class ApplicantsController extends BaseController {
     required: false,
     enum: PipelineStage,
   })
+  @ApiOkResponse({
+    description:
+      'Interview question set with scorecard and skills gap context.',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          stage: 'INTERVIEW_TECHNICAL',
+          audienceType: 'technical',
+          questions: [
+            {
+              question: 'How would you design a Rust service for this role?',
+              rationale: 'Rust is a required gap.',
+              dimension: 'Technology: Rust',
+              priority: 'MUST_ASK',
+            },
+          ],
+          scorecard: {
+            capabilities: {
+              backend: { score: 0.82, confidence: 'high' },
+              frontend: { score: 0.42, confidence: 'medium' },
+              devops: { score: 0.51, confidence: 'medium' },
+            },
+            stack: { languages: ['TypeScript'], tools: ['Anchor'] },
+            web3: { ecosystem: 'solana' },
+          },
+          skillsGap: {
+            requiredSkills: ['Rust', 'Solana'],
+            matchedTechnologies: ['Solana'],
+            missingTechnologies: ['Rust'],
+          },
+        },
+      },
+    },
+  })
   async getInterviewQuestions(
     @Req() req: any,
     @Param('appId') appId: string,
-    @Query('stage') stage?: string
+    @Query('stage') stage?: string,
   ) {
     const app = await this.applicantsService.findById(appId, req.user.id);
 
     const rawApp = await this.applicantsService['prisma'].shortlist.findUnique({
       where: { id: appId },
-      select: { interviewQuestions: true }
+      select: { interviewQuestions: true },
     });
 
     const interviewQuestions = (rawApp as any)?.interviewQuestions || [];
+    const scorecardContext = {
+      scorecard: (app as any).technicalView?.scorecard ?? null,
+      skillsGap: (app as any).technicalView?.skillsGap ?? null,
+    };
 
     if (!interviewQuestions.length) {
-      return this.handleSuccess({ questionsFound: false });
+      return this.handleSuccess({ questionsFound: false, ...scorecardContext });
     }
 
     if (stage) {
       const match = interviewQuestions.find((q: any) => q.stage === stage);
-      if (match) return this.handleSuccess(match);
+      if (match) return this.handleSuccess({ ...match, ...scorecardContext });
     }
 
-    return this.handleSuccess(interviewQuestions[interviewQuestions.length - 1]);
+    return this.handleSuccess({
+      ...interviewQuestions[interviewQuestions.length - 1],
+      ...scorecardContext,
+    });
   }
- 
 }
