@@ -29,8 +29,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { VerifiedAuth } from '../../shared/decorators/verified.decorator';
-import { RawScorecard } from './contract/scorecard.schema';
-
+import { PrismaService } from 'src/prisma/prisma.service';
 /**
  * Request DTOs
  */
@@ -50,7 +49,10 @@ class ScorecardErrorResponseDto {
 @ApiTags('Scorecard')
 @Controller('api/scorecard')
 export class ScorecardController {
-  constructor(private readonly scorecardService: ScorecardService) {}
+  constructor(
+    private readonly scorecardService: ScorecardService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * ----------------------------------------
@@ -97,7 +99,8 @@ export class ScorecardController {
       request.githubUsername,
     );
 
-    return this.scorecardService.mapToUiModel(result);
+    const scoreResult = await this.scorecardService.mapToUiModel(result);
+    return scoreResult;
   }
 
   /**
@@ -162,7 +165,8 @@ export class ScorecardController {
       );
     }
 
-    return this.scorecardService.mapToUiModel(scorecard);
+    const result = await this.scorecardService.mapToUiModel(scorecard, req.user.id);
+    return result;
   }
 
   /**
@@ -200,7 +204,20 @@ export class ScorecardController {
       );
     }
 
-    return this.scorecardService.mapToUiModel(scorecard);
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+      },
+    });
+    //TODO
+    if (user && user.id){
+      const result =await this.scorecardService.mapToUiModel(scorecard, user.id);
+      return result;
+    }
+
+    const result = await this.scorecardService.mapToUiModel(scorecard);
+    return result;
   }
 
   /**

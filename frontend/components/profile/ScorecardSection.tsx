@@ -6,6 +6,7 @@ import { startAnalysis, getMyScorecard, getMyRawScorecard } from '@/lib/api'
 import { ScorecardView, ScorecardData } from '@/components/ScorecardView'
 import { AnalysisPoller } from '@/components/AnalysisPoller'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
+import { normalizeScorecard } from '@/lib/scorecard/normalizeScorecard'
 
 export function ScorecardSection() {
   const queryClient = useQueryClient()
@@ -99,10 +100,13 @@ export function ScorecardSection() {
   }
 
   if (scorecardState === 'done' && scorecardData) {
+    const normalized = normalizeScorecard(scorecardData)
+
     return (
       <div className="space-y-6">
         <ScorecardView 
-          scorecard={scorecardData as unknown as ScorecardData} 
+        scorecard={normalized}
+          // scorecard={scorecardData as unknown as ScorecardData} 
           isPublic={false}
           onRegenerate={() => generateMut.mutate()}
         />

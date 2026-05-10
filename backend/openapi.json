@@ -4202,26 +4202,12 @@
                 "type": "string",
                 "format": "uri"
               },
-              "primaryCohort": {
-                "type": "string"
-              },
-              "seniority": {
-                "type": "string",
-                "enum": [
-                  "JUNIOR",
-                  "MID",
-                  "SENIOR",
-                  "LEAD"
-                ]
-              },
               "summary": {
                 "type": "string"
               }
             },
             "required": [
               "username",
-              "primaryCohort",
-              "seniority",
               "summary"
             ]
           },

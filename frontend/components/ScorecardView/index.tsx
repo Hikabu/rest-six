@@ -236,7 +236,7 @@ export function ScorecardView({
   ]
 
   const achievements = web3?.achievements ?? []
-
+  console.log("profile: ", profile);
   return (
     <Card className="w-full overflow-hidden border-border/40 bg-card/50 backdrop-blur-sm">
       {/* ── HEADER: Identity & Composite Score ──────────────── */}
@@ -258,18 +258,6 @@ export function ScorecardView({
                 <h2 className="text-xl font-bold text-foreground">
                   {profile.username ?? 'Anonymous Candidate'}
                 </h2>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {profile.seniority && (
-                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-semibold uppercase tracking-wider bg-muted/60">
-                      {profile.seniority}
-                    </Badge>
-                  )}
-                  {profile.primaryCohort && (
-                    <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-medium text-muted-foreground border-border/60">
-                      {profile.primaryCohort}
-                    </Badge>
-                  )}
-                </div>
               </div>
             </div>
 

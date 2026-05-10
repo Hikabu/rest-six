@@ -1273,7 +1273,7 @@ export type GithubSyncController_triggerSyncResponse =
 export async function GithubSyncController_triggerSync(
   request?: GithubSyncController_triggerSyncRequest,
 ): Promise<GithubSyncController_triggerSyncResponse> {
-  console.log("post github sync!");
+  // console.log("post github sync!");
   const parts = getRequestParts(request);
   return apiFetch<GithubSyncController_triggerSyncResponse>(
     withPathParams("/sync/github", parts.path),
@@ -2035,7 +2035,7 @@ export type ProfileController_getProfileResponse =
 export async function ProfileController_getProfile(
   request?: ProfileController_getProfileRequest,
 ): Promise<ProfileController_getProfileResponse> {
-  console.log("getting profile in frontend");
+  // console.log("getting profile in frontend");
   const parts = getRequestParts(request);
   return apiFetch<ProfileController_getProfileResponse>(
     withPathParams("/me/user", parts.path),
@@ -2059,10 +2059,10 @@ export type ProfileController_updateProfileResponse =
 export async function ProfileController_updateProfile(
   request: ProfileController_updateProfileRequest,
 ): Promise<ProfileController_updateProfileResponse> {
-  console.log("profile update frontned");
+  // console.log("profile update frontned");
 
   const parts = getRequestParts(request);
-  console.log("query: ", parts.query);
+  // console.log("query: ", parts.query);
   return apiFetch<ProfileController_updateProfileResponse>(
     withPathParams("/me/user", parts.path),
     {
