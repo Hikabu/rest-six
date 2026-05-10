@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -21,7 +21,7 @@ import { ProfileHeader } from '@/components/profile/ProfileHeader'
 import { ScorecardSection } from '@/components/profile/ScorecardSection'
 import { SettingsAccordion } from '@/components/profile/SettingsAccordion'
 
-export default function ProfilePage() {
+function ProfileContent() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
@@ -198,5 +198,13 @@ export default function ProfilePage() {
         <SettingsAccordion />
       </div>
     </div>
+  )
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading profile...</div>}>
+      <ProfileContent />
+    </Suspense>
   )
 }

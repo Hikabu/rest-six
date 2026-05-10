@@ -79,9 +79,9 @@ const recruiterNavigation: NavItem[] = [
     href: "/jobs",
     icon: Briefcase,
     items: [
-      { title: "All Jobs", href: "/jobs" },
-      { title: "Active", href: "/jobs/active" },
-      { title: "Draft", href: "/jobs/draft" },
+      { title: "All Jobs", href: "/hr/jobs" },
+      { title: "Active", href: "/hr/jobs/active" },
+      { title: "Draft", href: "/hr/jobs/draft" },
     ],
   },
   {
@@ -150,7 +150,7 @@ export function AppSidebar({
   onOpenCommandPalette,
   ...props
 }: AppSidebarProps) {
-  const { role: userRole, username } = useAuthStore()
+  const { role: userRole, username, email } = useAuthStore()
   const pathname = usePathname()
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
@@ -284,13 +284,15 @@ export function AppSidebar({
                 <DropdownMenuLabel className="p-0 font-normal">
                   <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                     <Avatar className="size-8 rounded-lg">
-                      <AvatarImage src="/avatars/user.jpg" alt="User" />
-                      <AvatarFallback className="rounded-lg">JD</AvatarFallback>
+                      <AvatarImage src="" alt={username ?? "User"} />
+                      <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
+                        {(username?.[0] ?? "U").toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">Jane Doe</span>
+                      <span className="truncate font-semibold">{username ?? "User"}</span>
                       <span className="truncate text-xs text-muted-foreground">
-                        jane@company.com
+                        {email ?? "No email"}
                       </span>
                     </div>
                   </div>

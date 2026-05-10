@@ -11,10 +11,16 @@ type AuthState = {
   token: string | null;
   role: AuthRole | null;
   username: string | null;
+  email: string | null;
+  walletAddress: string | null;
+  id: string | null;
   setAuth: (auth: {
     token?: string | null;
     role?: AuthRole | string | null;
     username?: string | null;
+    email?: string | null;
+    walletAddress?: string | null;
+    id?: string | null;
   }) => void;
   clearAuth: () => void;
 };
@@ -44,7 +50,10 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       role: null,
       username: null,
-      setAuth: ({ token, role, username }) => {
+      email: null,
+      walletAddress: null,
+      id: null,
+      setAuth: ({ token, role, username, email, walletAddress, id }) => {
         const normalizedRole = normalizeRole(role);
         
         // Sync with cookies for middleware
@@ -66,12 +75,15 @@ export const useAuthStore = create<AuthState>()(
           token: token ?? state.token,
           role: normalizedRole ?? state.role,
           username: username ?? state.username,
+          email: email ?? state.email,
+          walletAddress: walletAddress ?? state.walletAddress,
+          id: id ?? state.id,
         }));
       },
       clearAuth: () => {
         Cookies.remove(TOKEN_COOKIE_NAME);
         Cookies.remove(ROLE_COOKIE_NAME);
-        set({ token: null, role: null, username: null });
+        set({ token: null, role: null, username: null, email: null, walletAddress: null, id: null });
       },
     }),
     { name: "16signals-auth" },

@@ -11,6 +11,10 @@ import {
   Ghost,
   CheckCircle2,
   Circle,
+  Briefcase,
+  ShieldCheck,
+  TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import {
   Card,
@@ -29,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { EmptyState } from "@/components/empty-state";
 import Link from "next/link";
 import { JobsController_getMyJobs } from "@/lib/api";
 
@@ -40,15 +45,16 @@ const getTasks = async () => {
 export default function HRDashboardPage() {
   const { user } = usePrivy();
 
-  const { data: jobsResponse } = useQuery({
+  const { data: jobsResponse, isLoading: isLoadingJobs } = useQuery({
     queryKey: ["jobs", "me"],
     queryFn: () => JobsController_getMyJobs(),
   });
 
-  // Extract jobs depending on standard backend pagination/envelope response structure
   const jobs = Array.isArray(jobsResponse)
     ? jobsResponse
     : (jobsResponse as any)?.data || (jobsResponse as any)?.items || [];
+
+  const isNewCompany = !isLoadingJobs && jobs.length === 0;
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
@@ -104,7 +110,23 @@ export default function HRDashboardPage() {
         </section>
 
         {/* QUICK ACTIONS */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {isNewCompany ? (
+          <EmptyState
+            variant="hero"
+            icon={Sparkles}
+            title="Welcome to your hiring command center"
+            description="16Signals helps you find and hire exceptional people — with real work samples, escrow-backed offers, and data-driven decisions."
+            primaryAction={{ label: "Create your first job", route: "/hr/jobs/new" }}
+            secondaryAction={{ label: "Complete company profile", route: "/hr/settings" }}
+            features={[
+              { icon: Briefcase, text: "Post jobs with an escrow bonus to attract serious candidates" },
+              { icon: ShieldCheck, text: "Analyze real candidate work samples — not just CVs" },
+              { icon: TrendingUp, text: "Hire with proof and track your pipeline end-to-end" },
+            ]}
+          />
+        ) : (
+          <>
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link href="/hr/jobs/new">
             <Card className="hover:border-violet-500 hover:shadow-md transition-all cursor-pointer h-full group">
               <CardContent className="p-6 flex flex-col items-start gap-4">
@@ -297,6 +319,8 @@ export default function HRDashboardPage() {
             </Table>
           </Card>
         </section>
+          </>
+        )}
       </div>
 
       {/* GETTING STARTED CHECKLIST (RIGHT SIDEBAR) */}

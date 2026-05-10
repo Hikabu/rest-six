@@ -335,6 +335,9 @@ export type AuthResponse = {
   token: string;
   role: AuthRole;
   username?: string | null;
+  email?: string | null;
+  walletAddress?: string | null;
+  id?: string | null;
 };
 
 export type AuthUrlResponse = {
@@ -520,6 +523,9 @@ function normalizeAuthResponse(
     token,
     role: normalizeRole(nested.role, fallbackRole),
     username: typeof nested.username === "string" ? nested.username : null,
+    email: typeof nested.email === "string" ? nested.email : null,
+    walletAddress: typeof nested.walletAddress === "string" ? nested.walletAddress : null,
+    id: typeof nested.id === "string" ? nested.id : null,
   };
 }
 
@@ -637,6 +643,27 @@ export async function loginEmployerPrivy(
   return normalizeAuthResponse(body, "employer");
 }
 
+export type EmployerProfileResponse = {
+  id: string;
+  name: string;
+  email: string | null;
+  walletAddress: string | null;
+  privyId: string | null;
+  // there may be other fields but we only care about these right now
+};
+
+export async function getEmployerProfile(): Promise<EmployerProfileResponse> {
+  const body = await apiFetch<Record<string, unknown>>("/me/company", {
+    method: "GET",
+  });
+  
+  if (body.data && typeof body.data === "object") {
+    return body.data as EmployerProfileResponse;
+  }
+  
+  return body as unknown as EmployerProfileResponse;
+}
+
 type AnalyticsController_getDashboardOperation = ApiOperation<
   "/analytics/dashboard",
   "get"
@@ -728,7 +755,6 @@ export async function ApplicantsController_getMyApplications(
     },
   );
 }
-
 type ApplicantsController_getJobApplicationsOperation = ApiOperation<
   "/applications/hr/jobs/{jobId}",
   "get"
@@ -751,7 +777,18 @@ export async function ApplicantsController_getJobApplications(
     },
   );
 }
-
+// Fallback: Count applications from jobs endpoint
+export async function getEmployerCandidateCount(): Promise<number> {
+  const jobsResponse = await JobsController_getMyJobs();
+  const jobs = (jobsResponse as any)?.data ?? (jobsResponse as any)?.items ?? jobsResponse ?? [];
+  
+  if (!Array.isArray(jobs)) return 0;
+  
+  return jobs.reduce((total, job: any) => {
+    const count = job.applicationsCount ?? job.applicantsCount ?? job.candidates?.length ?? 0;
+    return total + (typeof count === 'number' ? count : 0);
+  }, 0);
+}
 type ApplicantsController_getApplicationDetailOperation = ApiOperation<
   "/applications/hr/{appId}",
   "get"
@@ -1365,13 +1402,43 @@ export async function JobsController_getPublicJobById(
   );
 }
 
+// type JobsController_createOperation = ApiOperation<"/jobs/draft", "post">;
+// export type JobsController_createRequest =
+//   ApiRequest<JobsController_createOperation>;
+// export type JobsController_createResponse =
+//   ApiResponse<JobsController_createOperation>;
+// export async function JobsController_create(
+//   request: JobsController_createRequest,
+// ): Promise<JobsController_createResponse> {
+//   const parts = getRequestParts(request);
+//   return apiFetch<JobsController_createResponse>(
+//     withPathParams("/jobs/draft", parts.path),
+//     {
+//       method: "POST",
+//       query: parts.query,
+//       headers: parts.headers,
+//       body: parts.body,
+//     },
+//   );
+// }
+// lib/api.ts - ADD THIS
+
+// Import your DTO types or define them here
+export interface CreateJobDraftDto {
+  title: string;
+  description: string;
+  location?: string;
+  employmentType?: string;
+  bonusAmount?: number;
+  currency?: string;
+}
+
 type JobsController_createOperation = ApiOperation<"/jobs/draft", "post">;
-export type JobsController_createRequest =
-  ApiRequest<JobsController_createOperation>;
-export type JobsController_createResponse =
-  ApiResponse<JobsController_createOperation>;
+export type JobsController_createRequest = ApiRequest<JobsController_createOperation>;
+export type JobsController_createResponse = ApiResponse<JobsController_createOperation>;
+
 export async function JobsController_create(
-  request: JobsController_createRequest,
+  request: JobsController_createRequest & { body: CreateJobDraftDto }
 ): Promise<JobsController_createResponse> {
   const parts = getRequestParts(request);
   return apiFetch<JobsController_createResponse>(
@@ -1379,8 +1446,11 @@ export async function JobsController_create(
     {
       method: "POST",
       query: parts.query,
-      headers: parts.headers,
-      body: parts.body,
+      headers: {
+        ...parts.headers,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request.body), // ✅ Send DTO as JSON
     },
   );
 }

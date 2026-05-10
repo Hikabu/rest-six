@@ -7,7 +7,7 @@ import { useLogin, useLoginWithEmail, usePrivy } from "@privy-io/react-auth";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { loginEmployerPrivy } from "@/lib/api";
+import { loginEmployerPrivy, getEmployerProfile } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import {
   Card,
@@ -70,8 +70,24 @@ export function PrivyEmployerAuthCard({
       console.debug("[PrivyEmployerAuthCard] Exchanging Privy token");
       return loginEmployerPrivy({ privyToken });
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      // Set token immediately so the API call has it
       useAuthStore.getState().setAuth({ token: data.token, role: "employer" });
+      
+      try {
+        const profile = await getEmployerProfile();
+        useAuthStore.getState().setAuth({ 
+          token: data.token, 
+          role: "employer",
+          username: profile.name,
+          email: profile.email,
+          walletAddress: profile.walletAddress,
+          id: profile.id
+        });
+      } catch (err) {
+        console.error("Failed to fetch employer profile:", err);
+      }
+
       onLoginSuccess?.();
       router.push("/hr/jobs/new");
     },
@@ -173,22 +189,6 @@ export function PrivyEmployerAuthCard({
   return (
     <Card className="mx-auto w-full max-w-md">
       {/* Privy badge */}
-      <div className="absolute top-3 right-3">
-        <a
-          href="https://privy.io"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={[
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5",
-            "text-[10px] font-medium",
-            "text-amber-400 bg-amber-400/10 border border-amber-400/30",
-            "hover:bg-amber-400/20 transition-colors",
-          ].join(" ")}
-        >
-          Powered by Privy
-          <ExternalLink className="h-2.5 w-2.5" />
-        </a>
-      </div>
 
       <CardHeader className="relative">
         <CardTitle>Employer Login</CardTitle>

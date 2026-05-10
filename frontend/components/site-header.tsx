@@ -1,11 +1,18 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useAuthStore } from "@/lib/auth-store"
 import { Button } from "@/components/ui/button"
 
 export function SiteHeader() {
   const { token, role } = useAuthStore()
+  const pathname = usePathname()
+
+  // Hide the global SiteHeader on the landing page since it has its own custom animated Navigation
+  if (pathname === "/") {
+    return null
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -45,3 +52,4 @@ export function SiteHeader() {
     </header>
   )
 }
+

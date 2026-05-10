@@ -27,23 +27,45 @@ export class AuthEmployerService {
       throw new UnauthorizedException('Invalid Privy token');
     }
 
-    const company = await this.prisma.company.upsert({
+    let company = await this.prisma.company.findUnique({
       where: { privyId: privyUserId },
-      update: {
-        email: email ?? undefined,
-        walletAddress: walletAddress ?? undefined,
-        smartAccountAddress: walletAddress ?? undefined,
-      },
-      create: {
-        privyId: privyUserId,
-        email: email ?? null,
-        walletAddress: walletAddress ?? null,
-        smartAccountAddress: walletAddress ?? null,
-        name: 'New company',
-        country: 'Unknown',
-        isVerified: true,
-      },
     });
+
+    if (!company && email) {
+      company = await this.prisma.company.findUnique({
+        where: { email },
+      });
+    }
+
+    if (!company && walletAddress) {
+      company = await this.prisma.company.findUnique({
+        where: { walletAddress },
+      });
+    }
+
+    if (company) {
+      company = await this.prisma.company.update({
+        where: { id: company.id },
+        data: {
+          privyId: privyUserId,
+          email: email ?? undefined,
+          walletAddress: walletAddress ?? undefined,
+          smartAccountAddress: walletAddress ?? undefined,
+        },
+      });
+    } else {
+      company = await this.prisma.company.create({
+        data: {
+          privyId: privyUserId,
+          email: email ?? null,
+          walletAddress: walletAddress ?? null,
+          smartAccountAddress: walletAddress ?? null,
+          name: 'New company',
+          country: 'Unknown',
+          isVerified: true,
+        },
+      });
+    }
 
     const payload = {
       sub: company.id,
