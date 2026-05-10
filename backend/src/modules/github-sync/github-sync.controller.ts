@@ -78,7 +78,7 @@ export class GithubSyncController {
   ) {
     await this.githubSyncService.connectGithub(req.user, state);
 
-    return res.redirect(`${process.env.FRONTEND_URL}/dashboard/github/syncing`);
+    return res.redirect(`${process.env.FRONTEND_URL}/profile?github_connected=true`);
   }
 
   // ─────────────────────────────────────────────
