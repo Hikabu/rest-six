@@ -2439,3 +2439,11 @@ export const confirmVouch = async (data: { signature: string, txData?: string })
   return (VouchesController_confirmVouch as any)({ body: data });
 };
 
+export const confirmEscrowFunded = async (data: { jobPostId: string, txSignature: string }) => {
+  return (EscrowController_confirmFunded as any)({ body: data });
+};
+
+export const getEscrowStatus = async (jobPostId: string) => {
+  return (EscrowController_status as any)({ path: { jobPostId } });
+};
+
