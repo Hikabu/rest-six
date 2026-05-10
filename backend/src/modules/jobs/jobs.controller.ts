@@ -78,7 +78,7 @@ export class JobsController extends BaseController {
   }
 
   // ─────────────────────────────
-  // COMAPNY JOBS
+  // COMPANY JOBS
   // ─────────────────────────────
 
   @Get('me')
@@ -114,26 +114,11 @@ export class JobsController extends BaseController {
     const jobs = await this.jobsService.findMyJobs(req.user.id);
     return this.handleSuccess(jobs);
   }
-
-  // ─────────────────────────────
-  // PUBLIC: JOB DETAILS
+ // ─────────────────────────────
+  // PUBLIC:DRAFT
   // ─────────────────────────────
 
   @Public()
-  @Get(':id')
-  @ApiOperation({
-    summary: 'Get job details (Public)',
-    description: 'Returns detailed information about a published job.',
-  })
-  async getPublicJobById(@Param('id') id: string) {
-    const job = await this.jobsService.getPublicJobById(id);
-    return this.handleSuccess(job);
-  }
-
-  // ─────────────────────────────
-  // CREATE JOB
-  // ─────────────────────────────
-
   @Post('draft')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt-employer'))
@@ -175,6 +160,22 @@ export class JobsController extends BaseController {
     const job = await this.jobsService.create(req.user.id, dto);
     return this.handleCreated(job, 'Job created successfully');
   }
+
+  // ─────────────────────────────
+  // PUBLIC: JOB DETAILS
+  // ─────────────────────────────
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get job details (Public)',
+    description: 'Returns detailed information about a published job.',
+  })
+  async getPublicJobById(@Param('id') id: string) {
+    const job = await this.jobsService.getPublicJobById(id);
+    return this.handleSuccess(job);
+  }
+ 
+
 
   // ─────────────────────────────
   // PARSE JD

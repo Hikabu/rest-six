@@ -1402,43 +1402,12 @@ export async function JobsController_getPublicJobById(
   );
 }
 
-// type JobsController_createOperation = ApiOperation<"/jobs/draft", "post">;
-// export type JobsController_createRequest =
-//   ApiRequest<JobsController_createOperation>;
-// export type JobsController_createResponse =
-//   ApiResponse<JobsController_createOperation>;
-// export async function JobsController_create(
-//   request: JobsController_createRequest,
-// ): Promise<JobsController_createResponse> {
-//   const parts = getRequestParts(request);
-//   return apiFetch<JobsController_createResponse>(
-//     withPathParams("/jobs/draft", parts.path),
-//     {
-//       method: "POST",
-//       query: parts.query,
-//       headers: parts.headers,
-//       body: parts.body,
-//     },
-//   );
-// }
-// lib/api.ts - ADD THIS
-
-// Import your DTO types or define them here
-export interface CreateJobDraftDto {
-  title: string;
-  description: string;
-  location?: string;
-  employmentType?: string;
-  bonusAmount?: number;
-  currency?: string;
-}
-
 type JobsController_createOperation = ApiOperation<"/jobs/draft", "post">;
 export type JobsController_createRequest = ApiRequest<JobsController_createOperation>;
 export type JobsController_createResponse = ApiResponse<JobsController_createOperation>;
 
 export async function JobsController_create(
-  request: JobsController_createRequest & { body: CreateJobDraftDto }
+  request: JobsController_createRequest,
 ): Promise<JobsController_createResponse> {
   const parts = getRequestParts(request);
   return apiFetch<JobsController_createResponse>(
@@ -1446,11 +1415,8 @@ export async function JobsController_create(
     {
       method: "POST",
       query: parts.query,
-      headers: {
-        ...parts.headers,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request.body), // ✅ Send DTO as JSON
+      headers: parts.headers,
+      body: parts.body,
     },
   );
 }

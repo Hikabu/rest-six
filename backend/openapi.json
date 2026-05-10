@@ -1529,31 +1529,6 @@
         ]
       }
     },
-    "/jobs/{id}": {
-      "get": {
-        "description": "Returns detailed information about a published job.",
-        "operationId": "JobsController_getPublicJobById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get job details (Public)",
-        "tags": [
-          "Jobs"
-        ]
-      }
-    },
     "/jobs/draft": {
       "post": {
         "description": "Creates a job in DRAFT status for the authenticated company.\n\nUse this endpoint when a company wants to start drafting a job listing before publishing it.",
@@ -1622,6 +1597,31 @@
           }
         ],
         "summary": "Create a new job post draft",
+        "tags": [
+          "Jobs"
+        ]
+      }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "description": "Returns detailed information about a published job.",
+        "operationId": "JobsController_getPublicJobById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get job details (Public)",
         "tags": [
           "Jobs"
         ]
