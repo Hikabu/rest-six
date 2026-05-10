@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PrivyService } from './privy.service';
-import { LoginDto } from './dto/login.dto';
 import { UnauthorizedException } from '@nestjs/common';
+import { PrivyAuthUser } from './privyAuth';
 
 /*
   Login via Privy on the frontend to get the accessToken
@@ -18,42 +17,28 @@ import { UnauthorizedException } from '@nestjs/common';
 export class AuthEmployerService {
   constructor(
     private prisma: PrismaService,
-    private privyService: PrivyService,
     private jwtService: JwtService,
   ) {}
 
-  async login(token: string, body: LoginDto) {
-    const { privyId, email } = await this.privyService.verifyToken(token);
+  async login(privyUser: PrivyAuthUser) {
+    const { privyUserId, email, walletAddress } = privyUser;
 
-    if (!privyId) {
+    if (!privyUserId) {
       throw new UnauthorizedException('Invalid Privy token');
     }
 
-    // Always fetch user from Privy to sync/verify privyId and get wallet address
-    const privyUser = await this.privyService.getUser(privyId);
-    const walletAddress =
-      (privyUser as any).wallet?.address ?? body.walletAddress ?? null;
-    const userEmail =
-      (privyUser as any).email?.address ??
-      (privyUser as any).google?.email ??
-      email ??
-      null;
-
-    if (!walletAddress) {
-      throw new UnauthorizedException('No wallet linked to Privy user');
-    }
-
     const company = await this.prisma.company.upsert({
-      where: { walletAddress },
+      where: { privyId: privyUserId },
       update: {
-        privyId,
-        email: userEmail || undefined,
+        email: email ?? undefined,
+        walletAddress: walletAddress ?? undefined,
+        smartAccountAddress: walletAddress ?? undefined,
       },
       create: {
-        privyId,
-        email: userEmail,
-        walletAddress,
-        smartAccountAddress: body.smartAccountAddress || walletAddress,
+        privyId: privyUserId,
+        email: email ?? null,
+        walletAddress: walletAddress ?? null,
+        smartAccountAddress: walletAddress ?? null,
         name: 'New company',
         country: 'Unknown',
         isVerified: true,
@@ -67,7 +52,16 @@ export class AuthEmployerService {
     };
 
     return {
-      accessToken: this.jwtService.sign(payload),
+      token: this.jwtService.sign(payload),
+      role: 'employer',
+      username: company.name,
+      user: {
+        id: company.id,
+        name: company.name,
+        email: company.email,
+        walletAddress: company.walletAddress,
+        privyUserId: company.privyId,
+      },
     };
   }
 }

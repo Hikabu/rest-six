@@ -1425,6 +1425,26 @@
             }
           },
           {
+            "name": "isDepositPaid",
+            "required": false,
+            "in": "query",
+            "description": "Filter jobs with escrow paid",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isVerifiedPayer",
+            "required": false,
+            "in": "query",
+            "description": "Filter jobs by companies with verified payer history",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -1825,37 +1845,9 @@
     },
     "/auth/employer/login": {
       "post": {
-        "description": "Verifies a Privy access token from frontend authentication and returns a signed JWT for API access. \nTESTING:\n 1. make sure .env > PRIVY_BYPASS=\"true\"\n2. Bearer Token = debugtoken \n3. Authorization header = did:privy:test-user-123 ",
+        "description": "Verifies a Privy access token from Authorization header and returns an employer JWT.",
         "operationId": "AuthEmployerController_login",
-        "parameters": [
-          {
-            "name": "authorization",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "description": "Optional login metadata used during company creation or update",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginDto"
-              },
-              "examples": {
-                "default": {
-                  "value": {
-                    "walletAddress": "0x123456789abcdef0123456789abcdef012345678",
-                    "smartAccountAddress": "0x123456789abcdef0123456789abcdef012345678"
-                  }
-                }
-              }
-            }
-          }
-        },
+        "parameters": [],
         "responses": {
           "200": {
             "description": "Successfully authenticated and returned application JWT",
@@ -4834,23 +4826,6 @@
           "innovationWeight",
           "isWeb3Role",
           "parserConfidence"
-        ]
-      },
-      "LoginDto": {
-        "type": "object",
-        "properties": {
-          "walletAddress": {
-            "type": "string",
-            "example": "0x123..."
-          },
-          "smartAccountAddress": {
-            "type": "string",
-            "example": "0xabc..."
-          }
-        },
-        "required": [
-          "walletAddress",
-          "smartAccountAddress"
         ]
       },
       "LoginResponseDto": {

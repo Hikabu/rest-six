@@ -251,8 +251,6 @@ export type CandidateRegisterInput = {
 
 export type EmployerLoginInput = {
   privyToken: string;
-  walletAddress?: string;
-  smartAccountAddress?: string;
 };
 
 export type PasswordResetRequestInput = {
@@ -527,15 +525,10 @@ export async function verifyMfaRecovery(
 export async function loginEmployerPrivy(
   input: EmployerPrivyLoginInput,
 ): Promise<AuthResponse> {
-  const walletAddress = input.walletAddress ?? "";
   const body = await apiFetch<unknown>("/auth/employer/login", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${input.privyToken}`,
-    },
-    body: {
-      walletAddress,
-      smartAccountAddress: input.smartAccountAddress ?? walletAddress,
     },
   });
   return normalizeAuthResponse(body, "employer");

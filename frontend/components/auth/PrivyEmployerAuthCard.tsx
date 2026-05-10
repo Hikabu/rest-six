@@ -61,16 +61,14 @@ export function PrivyEmployerAuthCard({
   });
 
   const exchangeMutation = useMutation({
-    mutationFn: async () => {
-      const privyToken = (await privy.getAccessToken()) ?? privy.user?.id;
+    mutationFn: async (tokenOverride?: string) => {
+      const privyToken = tokenOverride ?? (await privy.getAccessToken());
       if (!privyToken) {
         throw new Error("Privy authentication is incomplete.");
       }
 
-      return loginEmployerPrivy({
-        privyToken,
-        walletAddress: privy.user?.wallet?.address,
-      });
+      console.debug("[PrivyEmployerAuthCard] Exchanging Privy token");
+      return loginEmployerPrivy({ privyToken });
     },
     onSuccess: (data) => {
       useAuthStore.getState().setAuth({ token: data.token, role: "employer" });
@@ -80,6 +78,7 @@ export function PrivyEmployerAuthCard({
     onError: (err) => {
       setEmailLoading(false);
       setWalletLoading(false);
+      console.error("[PrivyEmployerAuthCard] Backend exchange failed", err);
       setStatus({
         kind: "error",
         message:
@@ -91,11 +90,11 @@ export function PrivyEmployerAuthCard({
   });
 
   useEffect(() => {
-    if (!privy.ready || !privy.authenticated || !privy.user || !activeMethod) {
+    if (!privy.ready || !privy.authenticated || !privy.user || activeMethod !== "wallet") {
       return;
     }
 
-    exchangeMutation.mutate();
+    exchangeMutation.mutate(undefined);
     // The mutation object is intentionally omitted to avoid re-running exchange
     // when React Query updates mutation state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,12 +113,14 @@ export function PrivyEmployerAuthCard({
     setActiveMethod("email");
     setEmailLoading(true);
     try {
+      console.debug("[PrivyEmployerAuthCard] Sending OTP code", { email: parsed.data });
       await sendCode({ email: parsed.data });
       setEmailLoading(false);
       setOtpSent(true);
-      setStatus({ kind: null, message: "" });
+      setStatus({ kind: "success", message: "Code sent. Check your inbox." });
     } catch (err) {
       setEmailLoading(false);
+      console.error("[PrivyEmployerAuthCard] sendCode failed", err);
       setStatus({
         kind: "error",
         message: err instanceof Error ? err.message : "Unable to send code.",
@@ -139,10 +140,19 @@ export function PrivyEmployerAuthCard({
 
     setEmailLoading(true);
     try {
+      console.debug("[PrivyEmployerAuthCard] Verifying OTP code");
       await loginWithCode({ code: parsed.data });
+      const privyToken = await privy.getAccessToken();
+      if (!privyToken) {
+        throw new Error(
+          "Privy authenticated but no access token returned. Check Privy app config.",
+        );
+      }
       setStatus({ kind: "success", message: "Verified. Logging you in..." });
+      await exchangeMutation.mutateAsync(privyToken);
     } catch (err) {
       setEmailLoading(false);
+      console.error("[PrivyEmployerAuthCard] loginWithCode failed", err);
       setStatus({
         kind: "error",
         message:
@@ -209,7 +219,7 @@ export function PrivyEmployerAuthCard({
                 {emailLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  "Send code"
+                  "Send Code"
                 )}
               </Button>
             )}

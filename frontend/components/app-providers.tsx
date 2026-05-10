@@ -11,7 +11,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
   const content = privyAppId ? (
-    <PrivyProvider appId={privyAppId}>{children}</PrivyProvider>
+    <PrivyProvider
+      appId={privyAppId}
+      config={{
+        loginMethods: ["email", "wallet"],
+      }}
+    >
+      {children}
+    </PrivyProvider>
   ) : (
     children
   );
