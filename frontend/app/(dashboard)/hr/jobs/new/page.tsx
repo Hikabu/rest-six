@@ -6,7 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -71,8 +71,7 @@ type WizardStep =
   | "escrow"
   | "analyzing"
   | "requirements"
-  | "review"
-  | "published";
+  | "review";
 
 const ROLE_TYPES: JobRoleType[] = [
   "BACKEND",
@@ -330,15 +329,16 @@ export default function CreateJobPage() {
   });
 
   const publishMutation = useMutation({
-    mutationFn: async () => {
-      if (!jobId) throw new Error("Missing job id.");
+    mutationFn: async (id: string) => {
+      if (!id) throw new Error("Missing job id.");
       return JobsController_publish({
-        path: { id: jobId },
+        path: { id },
       } as JobsController_publishRequest);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs", "me"] });
-      setStep("published");
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      router.push("/hr/jobs");
     },
     onError: (error) => {
       console.error("Publish failed:", error);
@@ -370,32 +370,6 @@ export default function CreateJobPage() {
       currency: "USD",
     });
   };
-
-  if (step === "published") {
-    return (
-      <div className="mx-auto max-w-2xl py-12">
-        <Card className="text-center">
-          <CardHeader>
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-              <Sparkles className="h-8 w-8 text-emerald-600" />
-            </div>
-            <CardTitle className="text-2xl">Job published</CardTitle>
-            <CardDescription>
-              Your job post is live and candidates can apply.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-center gap-3">
-              <Button variant="outline" onClick={() => router.push("/hr/jobs")}>
-                View all jobs
-              </Button>
-              <Button onClick={resetWizard}>Create another job</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-3xl py-8">
@@ -929,7 +903,7 @@ export default function CreateJobPage() {
                 disabled={busy || !jobId}
                 onClick={() => {
                   form.clearErrors("root");
-                  publishMutation.mutate();
+                  publishMutation.mutate(jobId!);
                 }}
               >
                 {publishMutation.isPending ? (

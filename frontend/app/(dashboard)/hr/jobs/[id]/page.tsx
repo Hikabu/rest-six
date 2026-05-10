@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ScorecardView, ScorecardData } from '@/components/ScorecardView'
@@ -302,9 +303,12 @@ function EscrowManagement({
 // Main Page
 // ---------------------------------------------------------------------------
 
-export default function CandidatePipelinePage({ params }: { params: { id: string } }) {
+export default function CandidatePipelinePage() {
+  const params = useParams()
   const queryClient = useQueryClient()
-  const jobId = params.id
+  const rawId = params?.id
+  const jobId =
+    typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : ''
   
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobileShowDetail, setMobileShowDetail] = useState(false)
@@ -314,6 +318,7 @@ export default function CandidatePipelinePage({ params }: { params: { id: string
   const { data: applicationsResponse } = useQuery({
     queryKey: ['applications', jobId],
     queryFn: () => getJobApplications(jobId),
+    enabled: !!jobId,
   })
   
   const candidates = (applicationsResponse as any)?.data || []
@@ -346,6 +351,7 @@ export default function CandidatePipelinePage({ params }: { params: { id: string
   const { data: escrowData } = useQuery({
     queryKey: ['escrow', jobId],
     queryFn: () => getEscrowStatus(jobId),
+    enabled: !!jobId,
     refetchInterval: (query) => (query.state.data as any)?.status === 'funded' ? 5000 : false,
   })
 
@@ -361,22 +367,35 @@ export default function CandidatePipelinePage({ params }: { params: { id: string
   })
 
   const { mutate: mutateSetCandidate, isPending: isSettingCandidate } = useMutation({
-    mutationFn: (walletAddress: string) => setEscrowCandidate({ jobPostId: jobId, candidateId: selectedId!, walletAddress }),
+    mutationFn: (walletAddress: string) => {
+      if (!jobId) throw new Error('Missing job id.')
+      if (!selectedId) throw new Error('Missing application.')
+      return setEscrowCandidate({ jobPostId: jobId, candidateId: selectedId, walletAddress })
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['escrow', jobId] }),
   })
 
   const { mutate: mutateConfirmFunded, isPending: isConfirmingFunded } = useMutation({
-    mutationFn: (txSig: string) => confirmEscrowFunded({ jobPostId: jobId, txSignature: txSig }),
+    mutationFn: (txSig: string) => {
+      if (!jobId) throw new Error('Missing job id.')
+      return confirmEscrowFunded({ jobPostId: jobId, txSignature: txSig })
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['escrow', jobId] }),
   })
 
   const { mutate: mutateConfirmReleased, isPending: isConfirmingReleased } = useMutation({
-    mutationFn: () => confirmEscrowReleased({ jobPostId: jobId }),
+    mutationFn: () => {
+      if (!jobId) throw new Error('Missing job id.')
+      return confirmEscrowReleased({ jobPostId: jobId })
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['escrow', jobId] }),
   })
 
   const { mutate: mutateConfirmRefunded, isPending: isConfirmingRefunded } = useMutation({
-    mutationFn: () => confirmEscrowRefunded({ jobPostId: jobId }),
+    mutationFn: () => {
+      if (!jobId) throw new Error('Missing job id.')
+      return confirmEscrowRefunded({ jobPostId: jobId })
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['escrow', jobId] }),
   })
 
