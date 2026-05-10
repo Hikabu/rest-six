@@ -2410,3 +2410,21 @@ export const submitWalletSignature = (body: any) => WalletSyncController_linkWal
 export const getMfaSetup = () => AuthCandidateController_setupMfa();
 export const activateMfa = (body: any) => AuthCandidateController_activateMfa({ body });
 export const deleteAccount = () => ProfileController_deactivateAccount();
+
+export const getMyApplications = () => ApplicantsController_getMyApplications();
+
+export const listJobs = (params: {
+  search?: string;
+  roleType?: string;
+  seniority?: string;
+  isWeb3?: boolean;
+  isDepositPaid?: boolean;
+  isVerifiedPayer?: boolean;
+  page?: number;
+  limit?: number;
+}): Promise<{ jobs: any[], total: number }> => (JobsController_getPublicJobs as any)({ query: params });
+
+export const getJob = (id: string) => JobsController_getPublicJobById({ path: { id } } as any);
+export const getGapPreview = (params: { jobId: string }) => ApplicantsController_getGapPreview({ query: params } as any);
+export const applyToJob = (jobId: string) => ApplicantsController_apply({ path: { jobId } } as any);
+
