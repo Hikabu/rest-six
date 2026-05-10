@@ -181,53 +181,6 @@ async function parseResponseBody(response: Response): Promise<unknown> {
     return text;
   }
 }
-
-
-// export async function apiFetch<ResponseBody>(
-//   path: string,
-//   options: ApiFetchOptions = {},
-// ): Promise<ResponseBody> {
-//   if (!API_BASE_URL) {
-//     throw new Error("NEXT_PUBLIC_API_URL is not configured");
-//   }
-
-//   const {
-//     body: requestBody,
-//     headers: customHeaders,
-//     query,
-//     ...fetchOptions
-//   } = options;
-//   const url = new URL(path, API_BASE_URL);
-//   appendQueryParams(url, query);
-
-//   const token = getAuthToken();
-//   const headers: Record<string, string> = {
-//     Accept: "application/json",
-//     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//     ...customHeaders,
-//   };
-
-//   const init: RequestInit = {
-//     credentials: "include",
-//     ...fetchOptions,
-//     headers,
-//   };
-
-//   if (requestBody !== undefined) {
-//     headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
-//     init.body = JSON.stringify(requestBody);
-//   }
-
-//   const response = await fetch(url, init);
-//   const body = await parseResponseBody(response);
-
-//   if (!response.ok) {
-//     throw new ApiError(response.status, body);
-//   }
-
-//   return body as ResponseBody;
-// }
-
 export async function apiFetch<ResponseBody>(
   path: string,
   options: ApiFetchOptions = {},
@@ -246,8 +199,8 @@ export async function apiFetch<ResponseBody>(
   const url = new URL(path, API_BASE_URL);
   appendQueryParams(url, query);
 
-  async function executeRequest() {
-    const token = getAuthToken();
+  async function executeRequest(overrideToken?: string) {
+    const token = overrideToken ?? getAuthToken();
 
     const headers: Record<string, string> = {
       Accept: "application/json",
@@ -274,15 +227,19 @@ export async function apiFetch<ResponseBody>(
     return { response, body };
   }
 
-  // FIRST ATTEMPT
+  // ─────────────────────────────
+  // 1. First request
+  // ─────────────────────────────
   let { response, body } = await executeRequest();
 
-  // SUCCESS
   if (response.ok) {
     return body as ResponseBody;
   }
 
-  // TRY REFRESH ON 401
+  // ─────────────────────────────
+  // 2. Handle 401 refresh
+  // ─────────────────────────────
+  console.log("response status: ", response.status);
   if (response.status === 401) {
     try {
       const refreshResponse = await fetch(
@@ -294,32 +251,42 @@ export async function apiFetch<ResponseBody>(
       );
 
       if (!refreshResponse.ok) {
-
         useAuthStore.getState().clearAuth();
         throw new ApiError(401, "Unauthorized");
       }
 
       const refreshBody = await refreshResponse.json();
+      const newToken = refreshBody.accessToken;
 
-      if (refreshBody.accessToken) {
-        useAuthStore.getState().setAuth({
-  token: refreshBody.accessToken,
-});
+      if (!newToken) {
+        useAuthStore.getState().clearAuth();
+        throw new ApiError(401, "Unauthorized");
       }
 
-      // RETRY ORIGINAL REQUEST
-      ({ response, body } = await executeRequest());
+      // ─────────────────────────────
+      // 3. Update store once
+      // ─────────────────────────────
+      useAuthStore.getState().setAuth({
+        token: newToken,
+      });
+
+      // ─────────────────────────────
+      // 4. Retry with fresh token
+      // ─────────────────────────────
+      console.log("retring wiht new token?");
+      ({ response, body } = await executeRequest(newToken));
 
       if (response.ok) {
         return body as ResponseBody;
       }
 
-      // STILL UNAUTHORIZED AFTER REFRESH
+      // still failing after refresh
       if (response.status === 401) {
+        console.log("refersh didnt work");
         useAuthStore.getState().clearAuth();
         throw new ApiError(401, "Unauthorized");
       }
-    } catch {
+    } catch (err) {
       useAuthStore.getState().clearAuth();
       throw new ApiError(401, "Unauthorized");
     }
@@ -327,7 +294,6 @@ export async function apiFetch<ResponseBody>(
 
   throw new ApiError(response.status, body);
 }
-
 
 export type AuthRole = "candidate" | "employer";
 

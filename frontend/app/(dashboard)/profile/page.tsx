@@ -87,7 +87,7 @@ export default function ProfilePage() {
       if (error?.status === 409) {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
         if (apiUrl) {
-          // Full browser redirect to the OAuth entry point
+          // Full browser  to the OAuth entry point
           window.location.href = `${apiUrl}/sync/github/connect`
         } else {
           toast({ title: "API URL not configured", variant: "destructive" })

@@ -110,26 +110,6 @@ export function ScorecardSection() {
           isPublic={false}
           onRegenerate={() => generateMut.mutate()}
         />
-        
-        {/* RAW DATA ACCORDION */}
-        <Accordion type="single" collapsible onValueChange={(v) => setIsRawDataOpen(v === 'raw-data')}>
-          <AccordionItem value="raw-data" className="border rounded-lg px-4 bg-muted/10">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <span className="font-medium text-sm text-muted-foreground">Inspect Raw Data</span>
-            </AccordionTrigger>
-            <AccordionContent>
-              {isRawLoading ? (
-                <div className="py-4 text-sm text-muted-foreground">Loading raw data...</div>
-              ) : rawData ? (
-                <pre className="p-4 bg-background border rounded-md overflow-x-auto text-xs text-muted-foreground mt-2">
-                  {JSON.stringify(rawData, null, 2)}
-                </pre>
-              ) : (
-                <div className="py-4 text-sm text-red-500">Failed to load raw data.</div>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
       </div>
     )
   }

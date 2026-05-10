@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/request'
+import type { NextRequest } from 'next/server'
 
-const TOKEN_COOKIE_NAME = '16signals-token'
+const TOKEN_COOKIE_NAME = 'access_token'
+const REFRESH_TOKEN_COOKIE_NAME = 'refresh_token'
 const ROLE_COOKIE_NAME = '16signals-role'
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const token = request.cookies.get(TOKEN_COOKIE_NAME)?.value
+  const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)?.value
   const role = request.cookies.get(ROLE_COOKIE_NAME)?.value
 
   // 1. Protected routes (Authentication required)
@@ -22,20 +24,23 @@ export function middleware(request: NextRequest) {
   const isProtectedRoute = isProfileRoute || isDashboardRoute || isHrRoute || isNewJobRoute || 
                            isCandidateListRoute || isAnalyticsRoute || isPipelineRoute || isSettingsRoute
 
-  if (isProtectedRoute && !token) {
+  // Redirect only if BOTH access token and refresh token are missing
+  if (isProtectedRoute && !token && !refreshToken) {
     const loginUrl = new URL('/auth', request.url)
     loginUrl.searchParams.set('from', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
   // 2. Role-based protection
+  const hasAuth = !!(token || refreshToken)
   const isEmployerOnlyRoute = isHrRoute || isNewJobRoute || isCandidateListRoute || isAnalyticsRoute || isPipelineRoute
-  if (token && isEmployerOnlyRoute && role !== 'employer') {
+  
+  if (hasAuth && isEmployerOnlyRoute && role !== 'employer') {
     return NextResponse.redirect(new URL('/profile', request.url))
   }
 
   const isCandidateOnlyRoute = isProfileRoute
-  if (token && isCandidateOnlyRoute && role !== 'candidate') {
+  if (hasAuth && isCandidateOnlyRoute && role !== 'candidate') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
