@@ -2428,3 +2428,14 @@ export const getJob = (id: string) => JobsController_getPublicJobById({ path: { 
 export const getGapPreview = (params: { jobId: string }) => ApplicantsController_getGapPreview({ query: params } as any);
 export const applyToJob = (jobId: string) => ApplicantsController_apply({ path: { jobId } } as any);
 
+export const initiateVouch = async (username: string, data: { message?: string }) => {
+  return (ActionsController_getBlinkTransaction as any)({
+    path: { username },
+    body: { account: '', data }
+  });
+};
+
+export const confirmVouch = async (data: { signature: string, txData?: string }) => {
+  return (VouchesController_confirmVouch as any)({ body: data });
+};
+
