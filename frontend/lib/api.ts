@@ -2447,3 +2447,43 @@ export const getEscrowStatus = async (jobPostId: string) => {
   return (EscrowController_status as any)({ path: { jobPostId } });
 };
 
+export const setEscrowCandidate = async (data: { jobPostId: string, candidateId: string, walletAddress: string }) => {
+  return (EscrowController_setCandidate as any)({ body: data });
+};
+
+export const confirmEscrowReleased = async (data: { jobPostId: string }) => {
+  return (EscrowController_confirmReleased as any)({ body: data });
+};
+
+export const confirmEscrowRefunded = async (data: { jobPostId: string }) => {
+  return (EscrowController_confirmRefunded as any)({ body: data });
+};
+
+// ---------------------------------------------------------------------------
+// Pipeline & Application Endpoints
+// ---------------------------------------------------------------------------
+export const getJobApplications = async (jobId: string) => {
+  return (ApplicantsController_getJobApplications as any)({ path: { jobId } });
+};
+
+export const getApplication = async (applicationId: string) => {
+  return (ApplicantsController_getApplicationDetail as any)({ path: { id: applicationId } });
+};
+
+export const getApplicationScorecard = async (applicationId: string) => {
+  return (ApplicantsController_getScorecard as any)({ path: { id: applicationId } });
+};
+
+export const getInterviewQuestions = async (applicationId: string) => {
+  return (ApplicantsController_getInterviewQuestions as any)({ path: { id: applicationId } });
+};
+
+export const updateStage = async (data: { applicationId: string, stage: string }) => {
+  return (ApplicantsController_advanceApplicationStage as any)({ path: { id: data.applicationId }, body: { stage: data.stage } });
+};
+
+export const updateDecision = async (data: { applicationId: string, decision: string }) => {
+  return (ApplicantsController_applyDecision as any)({ path: { id: data.applicationId }, body: { decision: data.decision } });
+};
+
+
