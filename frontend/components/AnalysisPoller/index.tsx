@@ -17,7 +17,7 @@ export function AnalysisPoller({ jobId, onComplete }: AnalysisPollerProps) {
   const { data } = useQuery({
     queryKey: ['analysis', jobId],
     queryFn: () => getAnalysisStatus(jobId),
-    refetchInterval: (query) => (query.state.data as any)?.status === 'done' ? false : 2000,
+    refetchInterval: (query) => (query.state.data as any)?.status === 'complete' ? false : 2000,
   })
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function AnalysisPoller({ jobId, onComplete }: AnalysisPollerProps) {
       }
     }
 
-    if ((data as any)?.status === 'done') {
+    if ((data as any)?.status === 'complete') {
       handleComplete()
     }
 

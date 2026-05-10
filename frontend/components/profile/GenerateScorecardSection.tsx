@@ -25,6 +25,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip'
+import { SolanaLinkButton } from './SolanaLinkButton'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,7 +49,6 @@ export interface GenerateScorecardSectionProps {
   /** ISO timestamp; undefined / null means available now */
   generateCooldownUntil?: string
   onSyncGithub: () => void
-  onLinkWallet: () => void
   onGenerate: () => void
   isSyncing: boolean
   isGenerating: boolean
@@ -118,7 +118,6 @@ export function GenerateScorecardSection({
   walletStatus,
   generateCooldownUntil,
   onSyncGithub,
-  onLinkWallet,
   onGenerate,
   isSyncing,
   isGenerating,
@@ -262,16 +261,12 @@ export function GenerateScorecardSection({
 
             {/* Right: only show action if not linked */}
             {!walletStatus.isLinked && (
-              <Button
+              <SolanaLinkButton 
                 variant="outline"
                 size="sm"
-                onClick={onLinkWallet}
-                disabled={walletOnCooldown}
                 className="h-7 px-2.5 text-xs shrink-0 cursor-pointer"
-              >
-                <Wallet className="mr-1.5 h-3 w-3" />
-                Link wallet
-              </Button>
+                onSuccess={() => {}} // Invalidation handled inside
+              />
             )}
           </div>
 

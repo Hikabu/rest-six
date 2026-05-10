@@ -7,7 +7,6 @@ import {
   UseGuards,
   NotFoundException,
   HttpCode,
-  HttpStatus,
   Req,
   BadRequestException,
   UsePipes,
@@ -15,6 +14,8 @@ import {
   UnauthorizedException,
   InternalServerErrorException,
   Inject,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
@@ -138,7 +139,37 @@ Optional if authenticated.
     //       }
     //     }
     if (req.user) {
-      const input = await this.resolveInputFromUser(req.user.id);
+      const userId = req.user.id;
+      
+      // Cooldown Check
+      const candidate = await this.prisma.candidate.findUnique({
+        where: { userId },
+        select: { generateCooldownUntil: true },
+      });
+
+      if (candidate?.generateCooldownUntil && candidate.generateCooldownUntil > new Date()) {
+        const diffMs = candidate.generateCooldownUntil.getTime() - Date.now();
+        const diffMinutes = Math.ceil(diffMs / (1000 * 60));
+        
+        throw new HttpException(
+          {
+            code: 'RATE_LIMITED',
+            message: `Please wait ${diffMinutes}m before generating a new scorecard.`,
+            cooldownUntil: candidate.generateCooldownUntil,
+            retryAfter: diffMinutes,
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      // Set new cooldown (1 hour from now)
+      const nextCooldown = new Date(Date.now() + 60 * 60 * 1000);
+      await this.prisma.candidate.update({
+        where: { userId },
+        data: { generateCooldownUntil: nextCooldown },
+      });
+
+      const input = await this.resolveInputFromUser(userId);
 
       githubUsername = input.githubUsername;
       walletAddress = input.walletAddress;

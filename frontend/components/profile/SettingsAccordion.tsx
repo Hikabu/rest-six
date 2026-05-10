@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { useAuthStore } from '@/lib/auth-store'
-import { useWalletFlow } from '@/lib/hooks/useWalletFlow'
+import { SolanaLinkButton } from './SolanaLinkButton'
 
 import {
   getLinkedGithub,
@@ -49,8 +49,6 @@ import {
   triggerGithubSync,
   getGithubSyncStatus,
   getLinkedWallet,
-  getWalletChallenge,
-  submitWalletSignature,
   getMfaSetup,
   activateMfa,
   deleteAccount,
@@ -328,16 +326,7 @@ export function SettingsAccordion() {
     queryFn: getLinkedWallet,
   })
 
-  const walletFlow = useWalletFlow(getWalletChallenge, submitWalletSignature)
 
-  React.useEffect(() => {
-    if (walletFlow.status === 'done') {
-      toast({ title: 'Wallet linked successfully!' })
-      queryClient.invalidateQueries({ queryKey: ['linkedWallet'] })
-    } else if (walletFlow.status === 'error') {
-      toast({ title: 'Failed to link wallet', variant: 'destructive' })
-    }
-  }, [walletFlow.status, queryClient, toast])
 
 
   // --- MFA ---
@@ -376,7 +365,7 @@ export function SettingsAccordion() {
       {/* ── LINKED ACCOUNTS ─────────────────────────────────────────── */}
       <AccordionItem value="linked-accounts">
         <AccordionTrigger className="hover:no-underline">
-          <span className="text-sm font-medium">Linked accounts</span>
+          <span className="text-sm font-medium">Login options</span>
         </AccordionTrigger>
         <AccordionContent>
           <div className="flex flex-col divide-y divide-border/60">
@@ -436,20 +425,11 @@ export function SettingsAccordion() {
               <p className="text-xs text-muted-foreground">
                 Connect a Solana wallet to enable on-chain verification and Web3 scoring.
               </p>
-              <Button
+              <SolanaLinkButton 
                 variant="outline"
                 size="sm"
-                onClick={() => walletFlow.trigger()}
-                disabled={walletFlow.status !== 'idle' && walletFlow.status !== 'error'}
                 className="w-fit cursor-pointer"
-              >
-                <Wallet className="mr-1.5 h-3.5 w-3.5" />
-                {walletFlow.status === 'challenging' && 'Challenging...'}
-                {walletFlow.status === 'signing' && 'Please Sign...'}
-                {walletFlow.status === 'submitting' && 'Verifying...'}
-                {walletFlow.status === 'idle' || walletFlow.status === 'error' ? 'Link wallet' : ''}
-                {walletFlow.status === 'done' && 'Linked!'}
-              </Button>
+              />
             </div>
           )}
         </AccordionContent>

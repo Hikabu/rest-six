@@ -87,6 +87,23 @@ export class ProfileService {
     return { message: 'Account deactivated successfully' };
   }
 
+  async getCooldowns(userId: string) {
+    const candidate = await this.prisma.candidate.findUnique({
+      where: { userId },
+      select: {
+        githubCooldownUntil: true,
+        walletCooldownUntil: true,
+        generateCooldownUntil: true,
+      },
+    });
+
+    return {
+      github: { cooldownUntil: candidate?.githubCooldownUntil ?? null },
+      wallet: { cooldownUntil: candidate?.walletCooldownUntil ?? null },
+      generate: { cooldownUntil: candidate?.generateCooldownUntil ?? null },
+    };
+  }
+
   // ─── Candidate Profile ────────────────────────────────────────────────────
 
   async getCandidateProfile(userId: string) {

@@ -27,6 +27,7 @@ import {
   GithubConnectionResponseDto,
   Web3ConnectionResponseDto,
   SimpleMessageResponseDto,
+  CooldownResponseDto,
 } from './dto/profile.response.dto';
 
 import { VerifiedAuth } from '../../shared/decorators/verified.decorator';
@@ -65,6 +66,16 @@ export class ProfileController {
   updateProfile(@Req() req: any, @Body() dto: UpdateUserDto) {
     console.log("hit hit");
     return this.profileService.updateProfile(req.user.id, dto);
+  }
+  
+  @Get('cooldown')
+  @ApiOperation({
+    summary: 'Get analysis and sync cooldowns',
+    description: 'Returns authoritative cooldown timestamps for the authenticated user.',
+  })
+  @ApiOkResponse({ type: CooldownResponseDto })
+  getCooldowns(@Req() req: any) {
+    return this.profileService.getCooldowns(req.user.id);
   }
 
   @Delete()

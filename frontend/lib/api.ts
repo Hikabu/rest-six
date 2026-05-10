@@ -2500,7 +2500,7 @@ export const getAnalysisCooldown = () => apiFetch<{
   github: { cooldownUntil: string | null },
   wallet: { cooldownUntil: string | null },
   generate: { cooldownUntil: string | null }
-}>('/api/analysis/cooldown');
+}>('/me/user/cooldown');
 export const getMe = () => ProfileController_getProfile();
 export const getCandidateProfile = () => ProfileController_getCandidateProfile();
 export const updateUser = (body: any) => ProfileController_updateProfile({ body });

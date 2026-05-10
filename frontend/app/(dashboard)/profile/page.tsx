@@ -180,9 +180,6 @@ export default function ProfilePage() {
         walletStatus={walletStatus}
         generateCooldownUntil={cooldown?.generate?.cooldownUntil ?? undefined}
         onSyncGithub={handleSyncGithub}
-        onLinkWallet={() => {
-          toast({ title: "Wallet linking triggered" })
-        }}
         onGenerate={() => generateMut.mutate()}
         isSyncing={syncMut.isPending}
         isGenerating={generateMut.isPending}

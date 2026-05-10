@@ -33,7 +33,7 @@ export function SiteHeader() {
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">
-                <Link href="/auth">Log in</Link>
+                <Link href="/auth"></Link>
               </Button>
               <Button asChild size="sm">
                 <Link href="/auth?mode=candidate">Sign up</Link>

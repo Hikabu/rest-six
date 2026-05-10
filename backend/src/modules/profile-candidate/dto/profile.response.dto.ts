@@ -95,6 +95,22 @@ export class Web3ConnectionResponseDto {
   @ApiProperty({ nullable: true })
   web3: any;
 }
+export class CooldownItemDto {
+  @ApiProperty({ nullable: true })
+  cooldownUntil: Date | null;
+}
+
+export class CooldownResponseDto {
+  @ApiProperty()
+  github: CooldownItemDto;
+
+  @ApiProperty()
+  wallet: CooldownItemDto;
+
+  @ApiProperty()
+  generate: CooldownItemDto;
+}
+
 export class SimpleMessageResponseDto {
   @ApiProperty()
   message: string;

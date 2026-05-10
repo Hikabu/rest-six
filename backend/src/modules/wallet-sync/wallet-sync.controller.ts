@@ -125,6 +125,7 @@ export class WalletSyncController {
       req.user.id,
       body.walletAddress,
       body.signature,
+      body.message,
     );
   }
 }

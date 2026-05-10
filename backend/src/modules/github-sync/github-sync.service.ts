@@ -116,23 +116,33 @@ export class GithubSyncService {
       });
     }
 
-    // Rate limit: 24h (skip if called internally from connectGithub — lastSyncAt is null on first sync)
-    if (githubProfile.lastSyncAt) {
-      const diffHours =
-        (Date.now() - new Date(githubProfile.lastSyncAt).getTime()) /
-        (1000 * 60 * 60);
+    // Rate limit check using Candidate.githubCooldownUntil
+    const candidate = await this.prisma.candidate.findUnique({
+      where: { userId },
+      select: { id: true, githubCooldownUntil: true },
+    });
 
-      if (diffHours < 24) {
-        throw new HttpException(
-          {
-            code: 'RATE_LIMITED',
-            message: 'You can only sync once every 24 hours.',
-            retryAfter: Math.ceil(24 - diffHours),
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
+    if (candidate?.githubCooldownUntil && candidate.githubCooldownUntil > new Date()) {
+      const diffMs = candidate.githubCooldownUntil.getTime() - Date.now();
+      const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+
+      throw new HttpException(
+        {
+          code: 'RATE_LIMITED',
+          message: `You can only sync once every 24 hours.`,
+          cooldownUntil: candidate.githubCooldownUntil,
+          retryAfter: diffHours,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
+
+    // Set new cooldown (24 hours from now)
+    const cooldownUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await this.prisma.candidate.update({
+      where: { userId },
+      data: { githubCooldownUntil: cooldownUntil },
+    });
 
     const updated = await this.prisma.githubProfile.update({
       where: { id: githubProfile.id },
