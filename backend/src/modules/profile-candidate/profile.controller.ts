@@ -27,6 +27,7 @@ import {
   GithubConnectionResponseDto,
   Web3ConnectionResponseDto,
   SimpleMessageResponseDto,
+  CooldownResponseDto,
 } from './dto/profile.response.dto';
 
 import { VerifiedAuth } from '../../shared/decorators/verified.decorator';
@@ -49,6 +50,7 @@ export class ProfileController {
   @ApiOkResponse({ type: UserProfileResponseDto })
   @ApiNotFoundResponse({ description: 'User not found' })
   getProfile(@Req() req: any) {
+    console.log("hit get profile in backend");
     return this.profileService.getProfile(req.user.id);
   }
 
@@ -62,7 +64,18 @@ export class ProfileController {
     description: 'Validation or username conflict error',
   })
   updateProfile(@Req() req: any, @Body() dto: UpdateUserDto) {
+    console.log("hit hit");
     return this.profileService.updateProfile(req.user.id, dto);
+  }
+  
+  @Get('cooldown')
+  @ApiOperation({
+    summary: 'Get analysis and sync cooldowns',
+    description: 'Returns authoritative cooldown timestamps for the authenticated user.',
+  })
+  @ApiOkResponse({ type: CooldownResponseDto })
+  getCooldowns(@Req() req: any) {
+    return this.profileService.getCooldowns(req.user.id);
   }
 
   @Delete()

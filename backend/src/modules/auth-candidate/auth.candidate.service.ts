@@ -103,6 +103,12 @@ export class AuthCandidateService {
         } as any,
       });
 
+      await this.prisma.candidate.create({
+        data: {
+          userId: user.id,
+        },
+      });
+
       this.logger.log(
         `REGISTRATION_SUCCESS: User ${user.id} registered locally`,
       );
@@ -429,6 +435,12 @@ export class AuthCandidateService {
         },
       },
     });
+
+    await this.prisma.candidate.create({
+        data: {
+          userId: user.id,
+        },
+      });
 
     await this.redis.del(`onboarding_claim:${oauth.claimId}`);
 

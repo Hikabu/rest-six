@@ -488,7 +488,7 @@ export default function CandidatePipelinePage({ params }: { params: { id: string
               {scorecardData && (
                 <>
                   <SectionHeading>Scorecard</SectionHeading>
-                  <ScorecardView scorecard={scorecardData as any} isPublic />
+                  <ScorecardView scorecard={scorecardData as unknown as ScorecardData} isPublic />
                   <Divider />
                 </>
               )}

@@ -1,4 +1,5 @@
 import type { paths } from "@/src/api/schema";
+import {useAuthStore } from "./auth-store";
 
 type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 type ApiOperation<
@@ -181,6 +182,52 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   }
 }
 
+
+// export async function apiFetch<ResponseBody>(
+//   path: string,
+//   options: ApiFetchOptions = {},
+// ): Promise<ResponseBody> {
+//   if (!API_BASE_URL) {
+//     throw new Error("NEXT_PUBLIC_API_URL is not configured");
+//   }
+
+//   const {
+//     body: requestBody,
+//     headers: customHeaders,
+//     query,
+//     ...fetchOptions
+//   } = options;
+//   const url = new URL(path, API_BASE_URL);
+//   appendQueryParams(url, query);
+
+//   const token = getAuthToken();
+//   const headers: Record<string, string> = {
+//     Accept: "application/json",
+//     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+//     ...customHeaders,
+//   };
+
+//   const init: RequestInit = {
+//     credentials: "include",
+//     ...fetchOptions,
+//     headers,
+//   };
+
+//   if (requestBody !== undefined) {
+//     headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
+//     init.body = JSON.stringify(requestBody);
+//   }
+
+//   const response = await fetch(url, init);
+//   const body = await parseResponseBody(response);
+
+//   if (!response.ok) {
+//     throw new ApiError(response.status, body);
+//   }
+
+//   return body as ResponseBody;
+// }
+
 export async function apiFetch<ResponseBody>(
   path: string,
   options: ApiFetchOptions = {},
@@ -195,36 +242,92 @@ export async function apiFetch<ResponseBody>(
     query,
     ...fetchOptions
   } = options;
+
   const url = new URL(path, API_BASE_URL);
   appendQueryParams(url, query);
 
-  const token = getAuthToken();
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...customHeaders,
-  };
+  async function executeRequest() {
+    const token = getAuthToken();
 
-  const init: RequestInit = {
-    credentials: "include",
-    ...fetchOptions,
-    headers,
-  };
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...customHeaders,
+    };
 
-  if (requestBody !== undefined) {
-    headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
-    init.body = JSON.stringify(requestBody);
+    const init: RequestInit = {
+      credentials: "include",
+      ...fetchOptions,
+      headers,
+    };
+
+    if (requestBody !== undefined) {
+      headers["Content-Type"] =
+        headers["Content-Type"] ?? "application/json";
+
+      init.body = JSON.stringify(requestBody);
+    }
+
+    const response = await fetch(url, init);
+    const body = await parseResponseBody(response);
+
+    return { response, body };
   }
 
-  const response = await fetch(url, init);
-  const body = await parseResponseBody(response);
+  // FIRST ATTEMPT
+  let { response, body } = await executeRequest();
 
-  if (!response.ok) {
-    throw new ApiError(response.status, body);
+  // SUCCESS
+  if (response.ok) {
+    return body as ResponseBody;
   }
 
-  return body as ResponseBody;
+  // TRY REFRESH ON 401
+  if (response.status === 401) {
+    try {
+      const refreshResponse = await fetch(
+        new URL("/auth/refresh", API_BASE_URL),
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+
+      if (!refreshResponse.ok) {
+
+        useAuthStore.getState().clearAuth();
+        throw new ApiError(401, "Unauthorized");
+      }
+
+      const refreshBody = await refreshResponse.json();
+
+      if (refreshBody.accessToken) {
+        useAuthStore.getState().setAuth({
+  token: refreshBody.accessToken,
+});
+      }
+
+      // RETRY ORIGINAL REQUEST
+      ({ response, body } = await executeRequest());
+
+      if (response.ok) {
+        return body as ResponseBody;
+      }
+
+      // STILL UNAUTHORIZED AFTER REFRESH
+      if (response.status === 401) {
+        useAuthStore.getState().clearAuth();
+        throw new ApiError(401, "Unauthorized");
+      }
+    } catch {
+      useAuthStore.getState().clearAuth();
+      throw new ApiError(401, "Unauthorized");
+    }
+  }
+
+  throw new ApiError(response.status, body);
 }
+
 
 export type AuthRole = "candidate" | "employer";
 
@@ -1163,6 +1266,7 @@ export type GithubSyncController_triggerSyncResponse =
 export async function GithubSyncController_triggerSync(
   request?: GithubSyncController_triggerSyncRequest,
 ): Promise<GithubSyncController_triggerSyncResponse> {
+  console.log("post github sync!");
   const parts = getRequestParts(request);
   return apiFetch<GithubSyncController_triggerSyncResponse>(
     withPathParams("/sync/github", parts.path),
@@ -1924,6 +2028,7 @@ export type ProfileController_getProfileResponse =
 export async function ProfileController_getProfile(
   request?: ProfileController_getProfileRequest,
 ): Promise<ProfileController_getProfileResponse> {
+  console.log("getting profile in frontend");
   const parts = getRequestParts(request);
   return apiFetch<ProfileController_getProfileResponse>(
     withPathParams("/me/user", parts.path),
@@ -1947,7 +2052,10 @@ export type ProfileController_updateProfileResponse =
 export async function ProfileController_updateProfile(
   request: ProfileController_updateProfileRequest,
 ): Promise<ProfileController_updateProfileResponse> {
+  console.log("profile update frontned");
+
   const parts = getRequestParts(request);
+  console.log("query: ", parts.query);
   return apiFetch<ProfileController_updateProfileResponse>(
     withPathParams("/me/user", parts.path),
     {
@@ -2385,7 +2493,7 @@ export const getAnalysisCooldown = () => apiFetch<{
   github: { cooldownUntil: string | null },
   wallet: { cooldownUntil: string | null },
   generate: { cooldownUntil: string | null }
-}>('/api/analysis/cooldown');
+}>('/me/user/cooldown');
 export const getMe = () => ProfileController_getProfile();
 export const getCandidateProfile = () => ProfileController_getCandidateProfile();
 export const updateUser = (body: any) => ProfileController_updateProfile({ body });

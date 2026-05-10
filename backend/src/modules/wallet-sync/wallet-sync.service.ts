@@ -4,6 +4,8 @@ import {
   BadRequestException,
   NotFoundException,
   UnauthorizedException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import Redis from 'ioredis';
@@ -34,21 +36,57 @@ export class WalletSyncService {
     userId: string,
     walletAddress: string,
     signature: string,
+    message?: string,
   ): Promise<{ linked: boolean; solanaAddress: string }> {
+    // Cooldown Check
+    const candidate = await this.prisma.candidate.findUnique({
+      where: { userId },
+      select: { walletCooldownUntil: true },
+    });
+
+    if (candidate?.walletCooldownUntil && candidate.walletCooldownUntil > new Date()) {
+      throw new HttpException('Please wait before linking another wallet.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     // Step 1 — validate walletAddress format
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(walletAddress)) {
       throw new BadRequestException('Invalid Solana wallet address');
     }
 
-    // Step 2 — retrieve challenge
-    const challenge = await this.redis.get(`wallet-challenge:${userId}`);
-    if (!challenge) {
-      throw new NotFoundException('Challenge expired or not found');
+    let finalChallenge: string;
+
+    if (message) {
+      // Simplified/Stateless flow
+      // Format: "Link Solana wallet to 16Signals\nUser: <userId>\nTimestamp: <ts>"
+      if (!message.includes(`User: ${userId}`)) {
+        throw new UnauthorizedException('Challenge message user mismatch');
+      }
+
+      const tsMatch = message.match(/Timestamp: (\d+)/);
+      if (!tsMatch) {
+        throw new BadRequestException('Invalid challenge message format');
+      }
+
+      const timestamp = parseInt(tsMatch[1], 10);
+      const now = Date.now();
+      if (Math.abs(now - timestamp) > 300_000) { // 5 minutes window
+        throw new UnauthorizedException('Challenge message expired');
+      }
+
+      finalChallenge = message;
+    } else {
+      // Step 2 — retrieve challenge from Redis (legacy flow)
+      const challenge = await this.redis.get(`wallet-challenge:${userId}`);
+      if (!challenge) {
+        throw new NotFoundException('Challenge expired or not found');
+      }
+      finalChallenge = challenge;
+      await this.redis.del(`wallet-challenge:${userId}`);
     }
 
     // Step 3 — verify signature
     try {
-      const msgBytes = Buffer.from(challenge, 'utf8');
+      const msgBytes = Buffer.from(finalChallenge, 'utf8');
       const sigBytes = bs58.decode(signature);
       const pubkeyBytes = new PublicKey(walletAddress).toBytes();
 
@@ -61,9 +99,6 @@ export class WalletSyncService {
         `Verification failed: ${(err as Error).message}`,
       );
     }
-
-    // Step 4 — delete challenge
-    await this.redis.del(`wallet-challenge:${userId}`);
     // console.log("userid: ", userId);
     // Step 5 — ensure Candidate + DeveloperCandidate exist
 
@@ -80,6 +115,12 @@ export class WalletSyncService {
       update: {
         solanaAddress: walletAddress,
       },
+    });
+
+    // Set 10m cooldown
+    await this.prisma.candidate.update({
+      where: { userId },
+      data: { walletCooldownUntil: new Date(Date.now() + 10 * 60 * 1000) },
     });
 
     return { linked: true, solanaAddress: walletAddress };

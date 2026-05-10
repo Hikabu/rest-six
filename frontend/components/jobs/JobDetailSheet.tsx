@@ -23,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAuthStore } from '@/lib/auth-store'
 import { type Job } from '@/components/jobs/JobCard'
 
 // ---------------------------------------------------------------------------
@@ -411,7 +412,31 @@ export function JobDetailSheet({
 
         {/* ── Sticky apply footer ─────────────────────────────────────── */}
         <div className="sticky bottom-0 z-10 border-t border-border bg-[#111827] p-4">
-          {isApplied ? (
+          {!useAuthStore.getState().token ? (
+            <div className="space-y-2">
+              <Button
+                asChild
+                className="w-full rounded-xl font-medium"
+              >
+                <Link href="/auth">Log in to apply</Link>
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                You must be logged in as a candidate to apply.
+              </p>
+            </div>
+          ) : useAuthStore.getState().role === 'employer' ? (
+            <div className="space-y-2">
+              <Button
+                className="w-full rounded-xl font-medium"
+                disabled
+              >
+                Candidates only
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                Employer accounts cannot apply to jobs.
+              </p>
+            </div>
+          ) : isApplied ? (
             <Button
               id="job-detail-apply-btn"
               className="w-full cursor-default rounded-xl border border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-400 hover:bg-emerald-500/10"

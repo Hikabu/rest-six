@@ -240,6 +240,8 @@ model User {
 
   firstName String?
   lastName  String?
+  name      String?
+
 
   role          UserRole      @default(CANDIDATE)
   accountStatus AccountStatus @default(ACTIVE)
@@ -288,9 +290,15 @@ model Candidate {
   userId     String              @unique
   user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   bio        String?             @db.VarChar(500)
+  location   String?             @db.VarChar(255)
+  website    String?             @db.VarChar(255)
   careerPath Int                 @default(1) // bitmask: 1=DEVELOPER
+
   devProfile DeveloperCandidate?
   shortlist  Shortlist[]
+  githubCooldownUntil   DateTime?
+  walletCooldownUntil   DateTime?
+  generateCooldownUntil DateTime?
   scorecard  Json? // { roleType, seniorityLevel, signals: { key: value }, overallFit }
   vouches    Vouch[]
   createdAt  DateTime            @default(now())

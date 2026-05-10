@@ -81,7 +81,7 @@ function UsernameCopyBadge({ username }: { username: string }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(`/u/${username}`).then(() => {
+    navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_FRONTEND_URL}/profile/${username}`).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     })
@@ -93,7 +93,7 @@ function UsernameCopyBadge({ username }: { username: string }) {
       aria-label="Copy profile path"
       className="group inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors duration-150 hover:border-border/80 hover:bg-muted/70 hover:text-foreground cursor-pointer"
     >
-      <span>/u/{username}</span>
+      <span>{process.env.NEXT_PUBLIC_FRONTEND_URL}/profile/{username}</span>
       <AnimatePresence mode="wait" initial={false}>
         {copied ? (
           <motion.span

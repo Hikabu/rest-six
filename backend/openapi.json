@@ -2675,6 +2675,34 @@
         ]
       }
     },
+    "/me/user/cooldown": {
+      "get": {
+        "description": "Returns authoritative cooldown timestamps for the authenticated user.",
+        "operationId": "ProfileController_getCooldowns",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get analysis and sync cooldowns",
+        "tags": [
+          "Profile (candidate)"
+        ]
+      }
+    },
     "/me/user/candidate": {
       "get": {
         "description": "Returns candidate-specific data including bio, career path, and dev profile.",
@@ -5136,6 +5164,10 @@
             "type": "string",
             "nullable": true
           },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
           "role": {
             "type": "string"
           },
@@ -5169,6 +5201,7 @@
           "username",
           "firstName",
           "lastName",
+          "name",
           "role",
           "accountStatus",
           "isEmailVerified",
@@ -5181,6 +5214,37 @@
       "UpdateUserDto": {
         "type": "object",
         "properties": {}
+      },
+      "CooldownItemDto": {
+        "type": "object",
+        "properties": {
+          "cooldownUntil": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "cooldownUntil"
+        ]
+      },
+      "CooldownResponseDto": {
+        "type": "object",
+        "properties": {
+          "github": {
+            "$ref": "#/components/schemas/CooldownItemDto"
+          },
+          "wallet": {
+            "$ref": "#/components/schemas/CooldownItemDto"
+          },
+          "generate": {
+            "$ref": "#/components/schemas/CooldownItemDto"
+          }
+        },
+        "required": [
+          "github",
+          "wallet",
+          "generate"
+        ]
       },
       "SimpleMessageResponseDto": {
         "type": "object",
@@ -5200,6 +5264,14 @@
             "type": "string"
           },
           "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "website": {
             "type": "string",
             "nullable": true
           },
@@ -5226,6 +5298,8 @@
         "required": [
           "id",
           "bio",
+          "location",
+          "website",
           "careerPath",
           "scorecard",
           "createdAt",
@@ -5467,6 +5541,11 @@
             "type": "string",
             "description": "Base58 encoded signature of the challenge signed by the wallet private key",
             "example": "5hK9xExampleSignatureBase58EncodedString"
+          },
+          "message": {
+            "type": "string",
+            "description": "The plaintext message that was signed",
+            "example": "Link Solana wallet to 16Signals\nUser: user123\nTimestamp: 1713940000000"
           }
         },
         "required": [

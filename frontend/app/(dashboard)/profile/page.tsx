@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getLinkedGithub,
@@ -23,6 +25,20 @@ export default function ProfilePage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  // Handle GitHub connection callback
+  useEffect(() => {
+    if (searchParams.get('github_connected') === 'true') {
+      toast({ title: "GitHub connected successfully!" })
+      queryClient.invalidateQueries({ queryKey: ['github'] })
+      queryClient.invalidateQueries({ queryKey: ['analysisCooldown'] })
+      // Clear the query param from URL without refreshing
+      router.replace('/profile')
+    }
+  }, [searchParams, queryClient, router, toast])
+
 
   // 0. Profile Queries & Mutations
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: getMe })
@@ -63,6 +79,29 @@ export default function ProfilePage() {
     queryFn: getLinkedGithub,
   })
   
+  const handleSyncGithub = async () => {
+    try {
+      await syncMut.mutateAsync()
+    } catch (error: any) {
+      // 409 Conflict means GitHub is not connected yet
+      if (error?.status === 409) {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+        if (apiUrl) {
+          // Full browser redirect to the OAuth entry point
+          window.location.href = `${apiUrl}/sync/github/connect`
+        } else {
+          toast({ title: "API URL not configured", variant: "destructive" })
+        }
+      } else {
+        toast({
+          title: "Sync failed",
+          description: error?.message || "Please try again later",
+          variant: "destructive"
+        })
+      }
+    }
+  }
+
   const syncMut = useMutation({
     mutationFn: triggerGithubSync,
     onSuccess: () => {
@@ -115,7 +154,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container max-w-4xl py-10 space-y-8">
+    <div className="mx-auto w-full max-w-4xl px-4 py-10 space-y-8">
       {/* S1: Profile Header */}
       <ProfileHeader
         user={{
@@ -140,10 +179,7 @@ export default function ProfilePage() {
         githubStatus={githubStatus}
         walletStatus={walletStatus}
         generateCooldownUntil={cooldown?.generate?.cooldownUntil ?? undefined}
-        onSyncGithub={() => syncMut.mutate()}
-        onLinkWallet={() => {
-          toast({ title: "Wallet linking triggered" })
-        }}
+        onSyncGithub={handleSyncGithub}
         onGenerate={() => generateMut.mutate()}
         isSyncing={syncMut.isPending}
         isGenerating={generateMut.isPending}

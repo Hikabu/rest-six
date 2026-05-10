@@ -50,7 +50,9 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-type UserRole = "recruiter" | "candidate"
+import { useAuthStore } from "@/lib/auth-store"
+
+type UserRole = "employer" | "candidate"
 
 interface NavItem {
   title: string
@@ -145,18 +147,18 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({
-  userRole = "recruiter",
   onOpenCommandPalette,
   ...props
 }: AppSidebarProps) {
+  const { role: userRole, username } = useAuthStore()
   const pathname = usePathname()
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
 
   const primaryNav =
-    userRole === "recruiter" ? recruiterNavigation : candidateNavigation
+    userRole === "employer" ? recruiterNavigation : candidateNavigation
   const secondaryNav =
-    userRole === "recruiter"
+    userRole === "employer"
       ? recruiterSecondaryNavigation
       : candidateSecondaryNavigation
 
@@ -215,7 +217,7 @@ export function AppSidebar({
         {/* Primary Navigation */}
         <SidebarGroup>
           <SidebarGroupLabel>
-            {userRole === "recruiter" ? "Recruiting" : "My Account"}
+            {userRole === "employer" ? "Recruiting" : "My Account"}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -259,15 +261,15 @@ export function AppSidebar({
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
                   <Avatar className="size-8 rounded-lg">
-                    <AvatarImage src="/avatars/user.jpg" alt="User" />
+                    <AvatarImage src="" alt={username ?? 'User'} />
                     <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
-                      JD
+                      {(username?.[0] ?? 'U').toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Jane Doe</span>
+                    <span className="truncate font-semibold">{username ?? 'User'}</span>
                     <span className="truncate text-xs text-muted-foreground">
-                      jane@company.com
+                      {userRole?.toUpperCase()}
                     </span>
                   </div>
                   <ChevronDown className="ml-auto size-4" />
@@ -303,7 +305,13 @@ export function AppSidebar({
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive-foreground">
+                <DropdownMenuItem 
+                  className="text-destructive-foreground cursor-pointer"
+                  onClick={() => {
+                    useAuthStore.getState().setAuth(null)
+                    window.location.href = '/'
+                  }}
+                >
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>

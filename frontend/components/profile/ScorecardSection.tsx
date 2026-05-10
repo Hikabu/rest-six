@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { startAnalysis, getMyScorecard, getMyRawScorecard } from '@/lib/api'
-import { ScorecardView } from '@/components/ScorecardView'
+import { ScorecardView, ScorecardData } from '@/components/ScorecardView'
 import { AnalysisPoller } from '@/components/AnalysisPoller'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
 
@@ -102,7 +102,7 @@ export function ScorecardSection() {
     return (
       <div className="space-y-6">
         <ScorecardView 
-          scorecard={scorecardData as any} 
+          scorecard={scorecardData as unknown as ScorecardData} 
           isPublic={false}
           onRegenerate={() => generateMut.mutate()}
         />
