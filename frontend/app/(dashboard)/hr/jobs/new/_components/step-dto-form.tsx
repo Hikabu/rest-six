@@ -31,8 +31,8 @@ const schema = z
     description: z.string().min(50),
     responsibilities: z.string().min(10),
     requirements: z.string().min(10),
-    salaryMin: z.coerce.number().min(0),
-    salaryMax: z.coerce.number().min(0),
+    salaryMin: z.union([z.literal(""), z.coerce.number().min(0)]),
+    salaryMax: z.union([z.literal(""), z.coerce.number().min(0)]),
     location: z.string().min(1),
     employmentType: z.string().min(1),
     bonusAmount: z.coerce.number().min(0),
@@ -40,6 +40,14 @@ const schema = z
     currency: z.string().min(1),
   })
   .superRefine((data, ctx) => {
+    if (data.salaryMin === "" || data.salaryMax === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Salary minimum and maximum are required.",
+        path: ["salaryMin"],
+      });
+      return;
+    }
     if (data.salaryMax < data.salaryMin) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -56,8 +64,8 @@ const defaults: StepDtoFormValues = {
   description: "",
   responsibilities: "",
   requirements: "",
-  salaryMin: 0,
-  salaryMax: 0,
+  salaryMin: "",
+  salaryMax: "",
   location: "Remote",
   employmentType: "Full-time",
   bonusAmount: 0,
@@ -79,6 +87,14 @@ function toStep1(v: StepDtoFormValues): Step1JobForm {
     roleType: v.roleType ?? "",
     currency: v.currency,
   };
+}
+
+function parseNumericInput(raw: string): number | "" {
+  const trimmed = raw.replace(/[^\d]/g, "");
+  if (!trimmed) return "";
+  const normalized = trimmed.replace(/^0+(?=\d)/, "");
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : "";
 }
 
 export function StepDtoForm(props: {
@@ -193,7 +209,15 @@ export function StepDtoForm(props: {
               <FormItem>
                 <FormLabel>Salary minimum (USD)</FormLabel>
                 <FormControl>
-                  <Input type="number" min={0} step="1" {...field} />
+                  <Input
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={field.value === "" ? "" : String(field.value)}
+                    onFocus={() => {
+                      if (field.value === 0) field.onChange("");
+                    }}
+                    onChange={(e) => field.onChange(parseNumericInput(e.target.value))}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -206,7 +230,15 @@ export function StepDtoForm(props: {
               <FormItem>
                 <FormLabel>Salary maximum (USD)</FormLabel>
                 <FormControl>
-                  <Input type="number" min={0} step="1" {...field} />
+                  <Input
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={field.value === "" ? "" : String(field.value)}
+                    onFocus={() => {
+                      if (field.value === 0) field.onChange("");
+                    }}
+                    onChange={(e) => field.onChange(parseNumericInput(e.target.value))}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

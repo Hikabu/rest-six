@@ -1,7 +1,7 @@
 import {
-  JobsController_close,
   JobsController_createJobPost,
   JobsController_parseJd,
+  apiFetch,
   unwrapApiSuccessData,
   type JobsController_createRequest,
   type JobsController_parseJdRequest,
@@ -18,18 +18,23 @@ export async function replaceDraftJob(args: {
   payload: CreateBody;
   jdText: string;
 }): Promise<{ jobId: string; parse: ParseJdData }> {
-  if (args.previousId) {
-    await JobsController_close({ path: { id: args.previousId } } as never);
-  }
+  let jobId = args.previousId ?? null;
 
-  const createdRaw = await JobsController_createJobPost({
-    body: args.payload,
-  } as JobsController_createRequest);
+  if (jobId) {
+    await apiFetch(`/jobs/${encodeURIComponent(jobId)}`, {
+      method: "PATCH",
+      body: args.payload,
+    });
+  } else {
+    const createdRaw = await JobsController_createJobPost({
+      body: args.payload,
+    } as JobsController_createRequest);
 
-  const created = unwrapApiSuccessData<{ id?: string }>(createdRaw);
-  const jobId = created?.id;
-  if (!jobId) {
-    throw new Error("Job created but no id was returned.");
+    const created = unwrapApiSuccessData<{ id?: string }>(createdRaw);
+    jobId = created?.id ?? null;
+    if (!jobId) {
+      throw new Error("Job created but no id was returned.");
+    }
   }
 
   const parseRaw = await JobsController_parseJd({

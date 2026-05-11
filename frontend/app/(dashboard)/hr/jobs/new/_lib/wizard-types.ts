@@ -7,8 +7,8 @@ export type Step1JobForm = {
   description: string;
   requirements: string;
   responsibilities: string;
-  salaryMin: number;
-  salaryMax: number;
+  salaryMin: number | "";
+  salaryMax: number | "";
   location: string;
   employmentType: string;
   bonusAmount: number;

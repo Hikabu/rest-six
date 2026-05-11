@@ -24,8 +24,8 @@ export function hashStep1(s: Step1JobForm): string {
     description: s.description.trim(),
     requirements: s.requirements.trim(),
     responsibilities: s.responsibilities.trim(),
-    salaryMin: s.salaryMin,
-    salaryMax: s.salaryMax,
+    salaryMin: s.salaryMin === "" ? null : s.salaryMin,
+    salaryMax: s.salaryMax === "" ? null : s.salaryMax,
     location: s.location.trim(),
     employmentType: s.employmentType.trim(),
     bonusAmount: s.bonusAmount,
@@ -34,13 +34,19 @@ export function hashStep1(s: Step1JobForm): string {
   });
 }
 
+function numericOrNull(v: number | ""): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
 /** Full markdown stored as `CreateJobDto.description` (matches prior single-page behavior). */
 export function buildMarkdownDescription(s: Step1JobForm): string {
+  const min = numericOrNull(s.salaryMin);
+  const max = numericOrNull(s.salaryMax);
   const salaryLine =
-    Number.isFinite(s.salaryMin) &&
-    Number.isFinite(s.salaryMax) &&
-    (s.salaryMin > 0 || s.salaryMax > 0)
-      ? `Salary range: ${formatMoney(s.salaryMin)} – ${formatMoney(s.salaryMax)} USD`
+    min != null &&
+    max != null &&
+    (min > 0 || max > 0)
+      ? `Salary range: ${formatMoney(min)} – ${formatMoney(max)} USD`
       : "Salary range: Not specified";
 
   const lines = [
@@ -109,11 +115,13 @@ export function buildAiMergedDescription(
     skillBullets,
     "",
     "## Compensation & logistics",
-    Number.isFinite(s.salaryMin) &&
-    Number.isFinite(s.salaryMax) &&
-    (s.salaryMin > 0 || s.salaryMax > 0)
-      ? `Salary range: ${formatMoney(s.salaryMin)} – ${formatMoney(s.salaryMax)} USD`
-      : "Salary range: Not specified",
+    (() => {
+      const min = numericOrNull(s.salaryMin);
+      const max = numericOrNull(s.salaryMax);
+      if (min == null || max == null) return "Salary range: Not specified";
+      if (min <= 0 && max <= 0) return "Salary range: Not specified";
+      return `Salary range: ${formatMoney(min)} – ${formatMoney(max)} USD`;
+    })(),
     s.location.trim() ? `Location: ${s.location.trim()}` : "",
     s.employmentType.trim()
       ? `Employment type: ${s.employmentType.trim()}`
@@ -149,7 +157,9 @@ export function salaryMarketNote(
 ): string {
   const parsed = parsedRaw as ParsedLike;
   const seniority = (parsed.seniorityLevel ?? "MID").toUpperCase();
-  const mid = (s.salaryMin + s.salaryMax) / 2;
+  const min = numericOrNull(s.salaryMin);
+  const max = numericOrNull(s.salaryMax);
+  const mid = min != null && max != null ? (min + max) / 2 : NaN;
   if (!Number.isFinite(mid) || mid <= 0) {
     return "Add a salary range so AI can sanity-check it against the inferred seniority.";
   }

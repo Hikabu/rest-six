@@ -62,33 +62,33 @@ interface StatData {
 // ============ MAIN COMPONENT ============
 export default function DashboardPage() {
   // Fetch employer profile
-  const {  profile, isLoading: isProfileLoading, error: profileError } = useQuery({
+  const { data: profile, isLoading: isProfileLoading, error: profileError } = useQuery({
     queryKey: ["employerProfile"],
     queryFn: getEmployerProfile,
-    retry: 1,
+    retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Fetch dashboard analytics
-  const {  analytics, isLoading: isAnalyticsLoading, error: analyticsError } = useQuery({
+  const { data: analytics, isLoading: isAnalyticsLoading, error: analyticsError } = useQuery({
     queryKey: ["dashboardAnalytics"],
     queryFn: async () => {
       const response = await AnalyticsController_getDashboard();
       // Handle wrapped vs unwrapped responses
       return (response as any)?.data ?? response;
     },
-    retry: 1,
+    retry: false,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
   // Fetch employer's jobs
-  const {  jobs, isLoading: isJobsLoading, error: jobsError } = useQuery({
+  const { data: jobs, isLoading: isJobsLoading, error: jobsError } = useQuery({
     queryKey: ["jobs", "me"],
     queryFn: async () => {
       const response = await JobsController_getMyJobs();
       return (response as any)?.data ?? (response as any)?.items ?? response;
     },
-    retry: 1,
+    retry: false,
     staleTime: 3 * 60 * 1000,
   });
 

@@ -3,7 +3,6 @@
 import * as React from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { JobsController_close } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { useJobWizardStore } from "../_lib/job-wizard-store";
 import { hashStep1 } from "../_lib/wizard-utils";
@@ -37,11 +36,6 @@ export function JobWizardPage() {
     const st = useJobWizardStore.getState();
     const h = hashStep1(data);
     if (st.draftJobId && st.step1AiHash && h !== st.step1AiHash) {
-      try {
-        await JobsController_close({ path: { id: st.draftJobId } } as never);
-      } catch {
-        /* best-effort — draft may already be gone */
-      }
       useJobWizardStore.setState({
         draftJobId: null,
         step1AiHash: null,

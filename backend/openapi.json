@@ -1664,6 +1664,46 @@
       }
     },
     "/jobs/{id}": {
+      "patch": {
+        "description": "Updates fields of a DRAFT job owned by the authenticated company. This is used by the job creation wizard autosave flow.",
+        "operationId": "JobsController_updateDraft",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Job ID",
+            "schema": {
+              "example": "cma9x1k2p0000qwert123",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update an existing draft job",
+        "tags": [
+          "Jobs"
+        ]
+      },
       "get": {
         "description": "Returns detailed information about a published job.",
         "operationId": "JobsController_getPublicJobById",

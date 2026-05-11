@@ -200,8 +200,14 @@ export function StepAiSuggestions(props: {
         <h3 className="text-sm font-medium">Salary sense-check</h3>
         <p className="mt-2 text-sm text-muted-foreground">{salaryNote}</p>
         <p className="mt-2 font-mono text-sm">
-          {props.step1.salaryMin.toLocaleString()} –{" "}
-          {props.step1.salaryMax.toLocaleString()} USD
+          {typeof props.step1.salaryMin === "number"
+            ? props.step1.salaryMin.toLocaleString()
+            : "—"}{" "}
+          –{" "}
+          {typeof props.step1.salaryMax === "number"
+            ? props.step1.salaryMax.toLocaleString()
+            : "—"}{" "}
+          USD
         </p>
       </section>
 

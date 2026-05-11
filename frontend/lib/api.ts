@@ -102,6 +102,13 @@ export type ApiFetchOptions = Omit<RequestInit, "body" | "headers"> & {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const COOKIE_AUTH_TOKEN = "__cookie_auth__";
 
+/**
+ * Lock that ensures only one token-refresh request is in-flight at a time.
+ * All 401'd requests wait on the same promise rather than each triggering
+ * a separate /auth/candidate/refresh call.
+ */
+let refreshPromise: Promise<string | null> | null = null;
+
 function getAuthToken(): string | null {
   const useAuthStore = globalThis.useAuthStore;
 
@@ -311,61 +318,84 @@ export async function apiFetch<ResponseBody>(
     return body as ResponseBody;
   }
 
-  // Candidates use cookie refresh; employers use Privy JWT + httpOnly cookie — no /auth/refresh.
+  // ── 401 HANDLING ─────────────────────────────────────────────────────────────
   if (response.status === 401) {
-    const role = useAuthStore?.getState?.()?.role;
+    const store = useAuthStore?.getState?.();
+    const role = store?.role;
 
+    // Employers use a Privy JWT — there is no refresh endpoint.
+    // Log out immediately and let AppProviders redirect to /auth.
     if (role !== "candidate") {
+      store?.logout?.();
       throw new ApiError(response.status, body);
     }
 
-    let refreshResponse: Response;
-    try {
-      refreshResponse = await fetch(
-        new URL("/auth/candidate/refresh", API_BASE_URL),
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-    } catch {
+    // Candidates: attempt ONE refresh using a module-level promise lock so
+    // parallel 401'd requests share a single /auth/candidate/refresh call.
+    if (!refreshPromise) {
+      refreshPromise = (async (): Promise<string | null> => {
+        try {
+          const refreshResponse = await fetch(
+            new URL("/auth/candidate/refresh", API_BASE_URL),
+            { method: "POST", credentials: "include" },
+          );
+
+          if (!refreshResponse.ok) {
+            store?.logout?.();
+            return null;
+          }
+
+          const refreshText = await refreshResponse.text();
+          if (!refreshText) {
+            store?.logout?.();
+            return null;
+          }
+
+          let refreshBody: { accessToken?: string } = {};
+          try {
+            refreshBody = JSON.parse(refreshText) as { accessToken?: string };
+          } catch {
+            store?.logout?.();
+            return null;
+          }
+
+          const newToken = refreshBody.accessToken ?? null;
+          if (newToken) {
+            store?.setAuth?.({ token: newToken });
+          } else {
+            store?.logout?.();
+          }
+          return newToken;
+        } catch {
+          store?.logout?.();
+          return null;
+        } finally {
+          // Always release the lock when the refresh attempt completes.
+          refreshPromise = null;
+        }
+      })();
+    }
+
+    const newToken = await refreshPromise;
+
+    if (!newToken) {
       throw new ApiError(401, body);
     }
 
-    const refreshText = await refreshResponse.text();
-    let refreshBody: { accessToken?: string } = {};
-
-    if (refreshText) {
-      try {
-        refreshBody = JSON.parse(refreshText) as { accessToken?: string };
-      } catch {
-        useAuthStore.getState().clearAuth();
-        throw new ApiError(401, { message: "Invalid refresh response" });
-      }
-    }
-
-    if (!refreshResponse.ok) {
-      useAuthStore.getState().clearAuth();
-      throw new ApiError(401, refreshBody ?? body);
-    }
-
-    if (refreshBody.accessToken) {
-      useAuthStore.getState().setAuth({
-        token: refreshBody.accessToken,
-      });
-    }
-
+    // Retry original request with the new token now in the store.
     ({ response, body } = await executeRequest());
 
     if (response.ok) {
       return body as ResponseBody;
     }
 
+    // If still 401 after a successful refresh, something is wrong — log out.
     if (response.status === 401) {
-      useAuthStore.getState().clearAuth();
+      store?.logout?.();
       throw new ApiError(401, body);
     }
   }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   throw new ApiError(response.status, body);
 }

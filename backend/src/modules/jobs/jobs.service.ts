@@ -102,6 +102,32 @@ export class JobsService {
     });
   }
 
+  async updateDraft(id: string, companyId: string, dto: CreateJobDto) {
+    const job = await this.prisma.jobPost.findUnique({ where: { id } });
+
+    if (!job || job.companyId !== companyId) {
+      throw new AppException('Job not found or access denied', 404);
+    }
+    if (job.status !== JobStatus.DRAFT) {
+      throw new BadRequestException('Only DRAFT jobs can be updated');
+    }
+
+    const data: any = {
+      title: dto.title,
+      description: dto.description,
+      location: dto.location ?? null,
+      employmentType: dto.employmentType ?? null,
+      currency: dto.currency ?? job.currency,
+      bonusAmount: dto.bonusAmount ?? 0,
+      roleType: dto.roleType ?? null,
+    };
+
+    return this.prisma.jobPost.update({
+      where: { id },
+      data,
+    });
+  }
+
   async verifyOwnership(id: string, companyId: string) {
     const job = await this.prisma.jobPost.findUnique({ where: { id } });
     if (!job || job.companyId !== companyId) {

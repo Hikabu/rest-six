@@ -17,6 +17,8 @@ import { ModeFormTransition, ModeSwitcher } from "@/components/ModeSwitcher";
 import {
   completeOnboarding,
   getApiErrorMessage,
+  getEmployerProfile,
+  apiFetch,
   registerCandidate,
   verifyEmail,
   verifyMfa,
@@ -77,14 +79,49 @@ function AuthPageContent() {
   const searchParams = useSearchParams();
   const token = useAuthStore((state) => state.token);
   const role = useAuthStore((state) => state.role);
+  const logout = useAuthStore((state) => state.logout);
+
+  // Track whether we're currently validating a stored token.
+  // This prevents briefly flashing the login form before redirecting
+  // AND prevents redirecting on a stale / expired token.
+  const [isValidating, setIsValidating] = useState(!!token);
 
   useEffect(() => {
     if (!token) {
+      setIsValidating(false);
       return;
     }
 
-    router.push(routeForRole(role));
-  }, [role, router, token]);
+    // Validate the stored token against a real API call.
+    // A 200 means the token is still valid → redirect.
+    // A 401 means the token is expired / invalid → stay on login.
+    let cancelled = false;
+
+    async function validateAndRedirect() {
+      try {
+        if (role === "employer") {
+          await getEmployerProfile();
+        } else {
+          // Candidates: validate access token against the profile endpoint
+          await apiFetch("/me/user", { method: "GET" });
+        }
+
+        if (!cancelled) {
+          router.push(routeForRole(role));
+        }
+      } catch {
+        // Token expired or invalid — clear auth and stay on this page.
+        if (!cancelled) {
+          logout();
+          setIsValidating(false);
+        }
+      }
+    }
+
+    validateAndRedirect();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount — intentionally omit reactive deps
 
   useEffect(() => {
     const resetToken = searchParams.get("reset_token") ?? searchParams.get("token");
@@ -205,6 +242,17 @@ function AuthPageContent() {
   function handleOnboardingComplete(data: OnboardingFormValues) {
     setOnboardingError(null);
     onboardingMutation.mutate(data);
+  }
+
+  // Show a neutral loading screen while we validate the stored token.
+  // Once validation finishes (success → redirect, failure → setIsValidating(false))
+  // the form becomes visible.
+  if (isValidating) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+      </main>
+    );
   }
 
   return (

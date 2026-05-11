@@ -187,9 +187,14 @@ function CardTable({ jobs }: { jobs: Record<string, unknown>[] }) {
                         : "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/hr/jobs/${id}`}>Pipeline</Link>
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/jobs/${id}`}>Preview</Link>
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/hr/jobs/${id}`}>Pipeline</Link>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

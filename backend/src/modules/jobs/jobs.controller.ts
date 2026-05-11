@@ -194,6 +194,29 @@ export class JobsController extends BaseController {
   }
 
   // ─────────────────────────────
+  // UPDATE DRAFT JOB
+  // ─────────────────────────────
+
+  @Patch(':id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt-employer'))
+  @ApiOperation({
+    summary: 'Update an existing draft job',
+    description:
+      'Updates fields of a DRAFT job owned by the authenticated company. This is used by the job creation wizard autosave flow.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Job ID',
+    example: 'cma9x1k2p0000qwert123',
+  })
+  @ApiBody({ type: CreateJobDto })
+  async updateDraft(@Req() req: any, @Param('id') id: string, @Body() dto: CreateJobDto) {
+    const job = await this.jobsService.updateDraft(id, req.user.id, dto);
+    return this.handleSuccess(job, 'Job updated successfully');
+  }
+
+  // ─────────────────────────────
   // PUBLIC: JOB DETAILS
   // ─────────────────────────────
 
