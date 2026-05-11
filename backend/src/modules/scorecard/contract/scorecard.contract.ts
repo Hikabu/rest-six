@@ -20,8 +20,6 @@ export const ScorecardUiSchema = z.object({
   profile: z.object({
     username: z.string().describe('GitHub username of the candidate'),
     avatarUrl: z.string().url().optional(),
-    primaryCohort: z.string(),
-    seniority: z.nativeEnum(Seniority),
     summary: z.string(),
   }),
 

@@ -922,6 +922,50 @@
         ]
       }
     },
+    "/api/scorecard/registered/{username}": {
+      "get": {
+        "description": "Fetch a cached scorecard for a registered username. Returns frontend-ready UI model.",
+        "operationId": "ScorecardController_getPublicRegScorecard",
+        "parameters": [
+          {
+            "name": "username",
+            "required": true,
+            "in": "path",
+            "description": "registered username",
+            "schema": {
+              "example": "octocat",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public scorecard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScorecardUiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No cached scorecard found. Must trigger analysis first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScorecardErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get public scorecard (UI)",
+        "tags": [
+          "Scorecard"
+        ]
+      }
+    },
     "/api/scorecard/me/raw": {
       "get": {
         "description": "Returns raw internal scorecard data for the authenticated user.",
@@ -4312,26 +4356,12 @@
                 "type": "string",
                 "format": "uri"
               },
-              "primaryCohort": {
-                "type": "string"
-              },
-              "seniority": {
-                "type": "string",
-                "enum": [
-                  "JUNIOR",
-                  "MID",
-                  "SENIOR",
-                  "LEAD"
-                ]
-              },
               "summary": {
                 "type": "string"
               }
             },
             "required": [
               "username",
-              "primaryCohort",
-              "seniority",
               "summary"
             ]
           },

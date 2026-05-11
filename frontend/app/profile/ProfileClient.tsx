@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -21,7 +21,7 @@ import { ProfileHeader } from '@/components/profile/ProfileHeader'
 import { ScorecardSection } from '@/components/profile/ScorecardSection'
 import { SettingsAccordion } from '@/components/profile/SettingsAccordion'
 
-function ProfileContent() {
+export default function ProfileClient() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
@@ -87,7 +87,7 @@ function ProfileContent() {
       if (error?.status === 409) {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
         if (apiUrl) {
-          // Full browser redirect to the OAuth entry point
+          // Full browser  to the OAuth entry point
           window.location.href = `${apiUrl}/sync/github/connect`
         } else {
           toast({ title: "API URL not configured", variant: "destructive" })
@@ -198,13 +198,5 @@ function ProfileContent() {
         <SettingsAccordion />
       </div>
     </div>
-  )
-}
-
-export default function ProfilePage() {
-  return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading profile...</div>}>
-      <ProfileContent />
-    </Suspense>
   )
 }

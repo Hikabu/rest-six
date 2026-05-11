@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { AppProviders } from "@/components/app-providers";
+import { AppNav } from "@/components/nav/AppNav";
 import "./globals.css";
 
 const inter = Inter({
@@ -60,7 +61,10 @@ export default function RootLayout({
       className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
     >
       <body className="font-sans antialiased bg-background">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <AppNav />
+          {children}
+        </AppProviders>
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>

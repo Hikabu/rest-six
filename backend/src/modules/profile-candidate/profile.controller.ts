@@ -50,7 +50,7 @@ export class ProfileController {
   @ApiOkResponse({ type: UserProfileResponseDto })
   @ApiNotFoundResponse({ description: 'User not found' })
   getProfile(@Req() req: any) {
-    console.log("hit get profile in backend");
+    // console.log("hit get profile in backend");
     return this.profileService.getProfile(req.user.id);
   }
 
@@ -64,7 +64,7 @@ export class ProfileController {
     description: 'Validation or username conflict error',
   })
   updateProfile(@Req() req: any, @Body() dto: UpdateUserDto) {
-    console.log("hit hit");
+    // console.log("hit hit");
     return this.profileService.updateProfile(req.user.id, dto);
   }
   

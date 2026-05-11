@@ -124,6 +124,12 @@ function AuthPageContent() {
   }, []); // Only run once on mount — intentionally omit reactive deps
 
   useEffect(() => {
+    if (searchParams.get("clear_session") === "true") {
+      useAuthStore.getState().clearAuth();
+      router.replace("/auth");
+      return;
+    }
+
     const resetToken = searchParams.get("reset_token") ?? searchParams.get("token");
     if (resetToken) {
       setMode("candidate");

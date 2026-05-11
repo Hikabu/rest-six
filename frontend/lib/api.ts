@@ -97,17 +97,16 @@ export type ApiFetchOptions = Omit<RequestInit, "body" | "headers"> & {
   body?: unknown;
   headers?: Record<string, string>;
   query?: Record<string, unknown>;
+  /** When true, the Authorization header is omitted entirely (e.g. public endpoints). */
+  skipAuth?: boolean;
+  /** Internal flag to prevent infinite loops during token refresh */
+  retried?: boolean;
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const COOKIE_AUTH_TOKEN = "__cookie_auth__";
 
-/**
- * Lock that ensures only one token-refresh request is in-flight at a time.
- * All 401'd requests wait on the same promise rather than each triggering
- * a separate /auth/candidate/refresh call.
- */
-let refreshPromise: Promise<string | null> | null = null;
+let refreshingPromise: Promise<void> | null = null;
 
 function getAuthToken(): string | null {
   const useAuthStore = globalThis.useAuthStore;
@@ -217,53 +216,6 @@ async function parseResponseBody(response: Response): Promise<unknown> {
     return text;
   }
 }
-
-
-// export async function apiFetch<ResponseBody>(
-//   path: string,
-//   options: ApiFetchOptions = {},
-// ): Promise<ResponseBody> {
-//   if (!API_BASE_URL) {
-//     throw new Error("NEXT_PUBLIC_API_URL is not configured");
-//   }
-
-//   const {
-//     body: requestBody,
-//     headers: customHeaders,
-//     query,
-//     ...fetchOptions
-//   } = options;
-//   const url = new URL(path, API_BASE_URL);
-//   appendQueryParams(url, query);
-
-//   const token = getAuthToken();
-//   const headers: Record<string, string> = {
-//     Accept: "application/json",
-//     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//     ...customHeaders,
-//   };
-
-//   const init: RequestInit = {
-//     credentials: "include",
-//     ...fetchOptions,
-//     headers,
-//   };
-
-//   if (requestBody !== undefined) {
-//     headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
-//     init.body = JSON.stringify(requestBody);
-//   }
-
-//   const response = await fetch(url, init);
-//   const body = await parseResponseBody(response);
-
-//   if (!response.ok) {
-//     throw new ApiError(response.status, body);
-//   }
-
-//   return body as ResponseBody;
-// }
-
 export async function apiFetch<ResponseBody>(
   path: string,
   options: ApiFetchOptions = {},
@@ -276,18 +228,19 @@ export async function apiFetch<ResponseBody>(
     body: requestBody,
     headers: customHeaders,
     query,
+    skipAuth,
     ...fetchOptions
   } = options;
 
   const url = new URL(path, API_BASE_URL);
   appendQueryParams(url, query);
 
-  async function executeRequest() {
-    const token = getAuthToken();
+  async function executeRequest(overrideToken?: string) {
+    const token = skipAuth ? null : (overrideToken ?? getAuthToken());
 
     const headers: Record<string, string> = {
       Accept: "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token && token !== COOKIE_AUTH_TOKEN ? { Authorization: `Bearer ${token}` } : {}),
       ...customHeaders,
     };
 
@@ -310,96 +263,47 @@ export async function apiFetch<ResponseBody>(
     return { response, body };
   }
 
-  // FIRST ATTEMPT
+  // ─────────────────────────────
+  // 1. First request
+  // ─────────────────────────────
   let { response, body } = await executeRequest();
 
-  // SUCCESS
   if (response.ok) {
     return body as ResponseBody;
   }
 
-  // ── 401 HANDLING ─────────────────────────────────────────────────────────────
-  if (response.status === 401) {
-    const store = useAuthStore?.getState?.();
-    const role = store?.role;
-
-    // Employers use a Privy JWT — there is no refresh endpoint.
-    // Log out immediately and let AppProviders redirect to /auth.
-    if (role !== "candidate") {
-      store?.logout?.();
-      throw new ApiError(response.status, body);
-    }
-
-    // Candidates: attempt ONE refresh using a module-level promise lock so
-    // parallel 401'd requests share a single /auth/candidate/refresh call.
-    if (!refreshPromise) {
-      refreshPromise = (async (): Promise<string | null> => {
-        try {
-          const refreshResponse = await fetch(
-            new URL("/auth/candidate/refresh", API_BASE_URL),
-            { method: "POST", credentials: "include" },
-          );
-
-          if (!refreshResponse.ok) {
-            store?.logout?.();
-            return null;
+  // ─────────────────────────────
+  // 2. Handle 401 refresh
+  // ─────────────────────────────
+  if (response.status === 401 && !fetchOptions.retried) {
+    if (!refreshingPromise) {
+      refreshingPromise = fetch(API_BASE_URL + "/auth/candidate/refresh", {
+        method: "POST",
+        credentials: "include",
+      })
+        .then(async (r) => {
+          if (!r.ok) {
+            useAuthStore.getState().clearAuth();
+            throw new Error("Session expired");
           }
-
-          const refreshText = await refreshResponse.text();
-          if (!refreshText) {
-            store?.logout?.();
-            return null;
-          }
-
-          let refreshBody: { accessToken?: string } = {};
-          try {
-            refreshBody = JSON.parse(refreshText) as { accessToken?: string };
-          } catch {
-            store?.logout?.();
-            return null;
-          }
-
-          const newToken = refreshBody.accessToken ?? null;
-          if (newToken) {
-            store?.setAuth?.({ token: newToken });
-          } else {
-            store?.logout?.();
-          }
-          return newToken;
-        } catch {
-          store?.logout?.();
-          return null;
-        } finally {
-          // Always release the lock when the refresh attempt completes.
-          refreshPromise = null;
-        }
-      })();
+        })
+        .finally(() => {
+          refreshingPromise = null;
+        });
     }
 
-    const newToken = await refreshPromise;
+    await refreshingPromise;
 
-    if (!newToken) {
-      throw new ApiError(401, body);
-    }
-
-    // Retry original request with the new token now in the store.
-    ({ response, body } = await executeRequest());
-
-    if (response.ok) {
-      return body as ResponseBody;
-    }
-
-    // If still 401 after a successful refresh, something is wrong — log out.
-    if (response.status === 401) {
-      store?.logout?.();
-      throw new ApiError(401, body);
-    }
+    // retry original request — new access_token cookie is now set
+    return apiFetch<ResponseBody>(path, { ...options, retried: true });
   }
-  // ─────────────────────────────────────────────────────────────────────────────
 
-  throw new ApiError(response.status, body);
+  if (!response.ok) {
+    throw new ApiError(response.status, body);
+  }
+
+  return body as ResponseBody;
 }
-
 
 export type AuthRole = "candidate" | "employer";
 
@@ -611,6 +515,10 @@ export async function loginCandidate(
   return normalizeAuthResponse(body, "candidate");
 }
 
+export async function logoutCandidate(): Promise<void> {
+  await AuthCandidateController_logout();
+}
+
 export async function registerCandidate(
   input: CandidateRegisterInput,
 ): Promise<void> {
@@ -637,6 +545,10 @@ export async function loginEmployer(
   input: EmployerLoginInput,
 ): Promise<AuthResponse> {
   return loginEmployerPrivy(input);
+}
+
+export async function logoutEmployer(): Promise<void> {
+  await AuthEmployerController_logout();
 }
 
 export async function requestPasswordReset(
@@ -1068,6 +980,24 @@ export async function ScorecardController_getPublicScorecard(
   );
 }
 
+/**
+ * Fetch a public scorecard by GitHub username with no auth.
+ * This is the only unauthenticated API call in the app.
+ */
+export async function getPublicScorecard(
+  username: string,
+): Promise<ScorecardController_getPublicScorecardResponse | null> {
+  try {
+    return await apiFetch<ScorecardController_getPublicScorecardResponse>(
+      `/api/scorecard/registered/${username}`,
+      { method: "GET", skipAuth: true },
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    return null;
+  }
+}
+
 type ScorecardController_getMyScorecardRawOperation = ApiOperation<
   "/api/scorecard/me/raw",
   "get"
@@ -1375,7 +1305,7 @@ export type GithubSyncController_triggerSyncResponse =
 export async function GithubSyncController_triggerSync(
   request?: GithubSyncController_triggerSyncRequest,
 ): Promise<GithubSyncController_triggerSyncResponse> {
-  console.log("post github sync!");
+  // console.log("post github sync!");
   const parts = getRequestParts(request);
   return apiFetch<GithubSyncController_triggerSyncResponse>(
     withPathParams("/sync/github", parts.path),
@@ -1427,6 +1357,7 @@ export async function JobsController_getPublicJobs(
       query: parts.query,
       headers: parts.headers,
       body: parts.body,
+      skipAuth: true,
     },
   );
 }
@@ -2184,7 +2115,7 @@ export type ProfileController_getProfileResponse =
 export async function ProfileController_getProfile(
   request?: ProfileController_getProfileRequest,
 ): Promise<ProfileController_getProfileResponse> {
-  console.log("getting profile in frontend");
+  // console.log("getting profile in frontend");
   const parts = getRequestParts(request);
   return apiFetch<ProfileController_getProfileResponse>(
     withPathParams("/me/user", parts.path),
@@ -2208,10 +2139,10 @@ export type ProfileController_updateProfileResponse =
 export async function ProfileController_updateProfile(
   request: ProfileController_updateProfileRequest,
 ): Promise<ProfileController_updateProfileResponse> {
-  console.log("profile update frontned");
+  // console.log("profile update frontned");
 
   const parts = getRequestParts(request);
-  console.log("query: ", parts.query);
+  // console.log("query: ", parts.query);
   return apiFetch<ProfileController_updateProfileResponse>(
     withPathParams("/me/user", parts.path),
     {
@@ -2679,7 +2610,7 @@ export const listJobs = (params: {
   isVerifiedPayer?: boolean;
   page?: number;
   limit?: number;
-}): Promise<{ jobs: any[], total: number }> => (JobsController_getPublicJobs as any)({ query: params });
+}): Promise<{ jobs: any[], total: number }> => apiFetch("/jobs", { method: "GET", query: params as any, skipAuth: true });
 
 export const getJob = (id: string) => JobsController_getPublicJobById({ path: { id } } as any);
 export const getGapPreview = (params: { jobId: string }) => {
@@ -2695,12 +2626,22 @@ export const applyToJob = (jobId: string) => {
   return ApplicantsController_apply({ path: { jobId } } as any);
 };
 
-export const initiateVouch = async (username: string, data: { message?: string }) => {
-  return (ActionsController_getBlinkTransaction as any)({
-    path: { username },
-    body: { account: '', data }
-  });
-};
+export const initiateVouch = async (
+  username: string,
+  data: { message?: string },
+  account: string
+) => {
+  return apiFetch<any>(`/api/actions/vouch/${username}`, {
+    method: "POST",
+    body: {
+      account,
+      data: data.message
+        ? { message: data.message }
+        : undefined,
+    },
+    skipAuth: true,
+  })
+}
 
 export const confirmVouch = async (data: { signature: string, txData?: string }) => {
   return (VouchesController_confirmVouch as any)({ body: data });
@@ -2771,4 +2712,17 @@ export const updateDecision = async (data: { applicationId: string, decision: st
   return (ApplicantsController_applyDecision as any)({ path: { id: data.applicationId }, body: { decision: data.decision } });
 };
 
-
+export async function rehydrateAuth(): Promise<void> {
+  try {
+    const user = await apiFetch<any>("/me/user");
+    if (user && user.id) {
+      useAuthStore.getState().setAuth({
+        token: COOKIE_AUTH_TOKEN,
+        role: user.role ?? "candidate",
+        username: user.username,
+      });
+    }
+  } catch (error) {
+    useAuthStore.getState().clearAuth();
+  }
+}
