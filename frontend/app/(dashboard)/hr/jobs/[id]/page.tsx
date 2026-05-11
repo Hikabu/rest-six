@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { notFound, useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ScorecardView, ScorecardData } from '@/components/ScorecardView'
@@ -22,7 +22,8 @@ import {
   setEscrowCandidate,
   confirmEscrowFunded,
   confirmEscrowReleased,
-  confirmEscrowRefunded
+  confirmEscrowRefunded,
+  isValidJobPostPathId,
 } from '@/lib/api'
 
 // ---------------------------------------------------------------------------
@@ -303,13 +304,11 @@ function EscrowManagement({
 // Main Page
 // ---------------------------------------------------------------------------
 
-export default function CandidatePipelinePage() {
-  const params = useParams()
+function CandidatePipelinePageInner({ jobId }: { jobId: string }) {
   const queryClient = useQueryClient()
-  const rawId = params?.id
-  const jobId =
-    typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : ''
-  
+
+  const jobApisEnabled = isValidJobPostPathId(jobId)
+
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobileShowDetail, setMobileShowDetail] = useState(false)
   const [interviewOpen, setInterviewOpen] = useState(false)
@@ -318,7 +317,7 @@ export default function CandidatePipelinePage() {
   const { data: applicationsResponse } = useQuery({
     queryKey: ['applications', jobId],
     queryFn: () => getJobApplications(jobId),
-    enabled: !!jobId,
+    enabled: jobApisEnabled,
   })
   
   const candidates = (applicationsResponse as any)?.data || []
@@ -351,7 +350,7 @@ export default function CandidatePipelinePage() {
   const { data: escrowData } = useQuery({
     queryKey: ['escrow', jobId],
     queryFn: () => getEscrowStatus(jobId),
-    enabled: !!jobId,
+    enabled: jobApisEnabled,
     refetchInterval: (query) => (query.state.data as any)?.status === 'funded' ? 5000 : false,
   })
 
@@ -368,7 +367,7 @@ export default function CandidatePipelinePage() {
 
   const { mutate: mutateSetCandidate, isPending: isSettingCandidate } = useMutation({
     mutationFn: (walletAddress: string) => {
-      if (!jobId) throw new Error('Missing job id.')
+      if (!isValidJobPostPathId(jobId)) throw new Error('Missing job id.')
       if (!selectedId) throw new Error('Missing application.')
       return setEscrowCandidate({ jobPostId: jobId, candidateId: selectedId, walletAddress })
     },
@@ -377,7 +376,7 @@ export default function CandidatePipelinePage() {
 
   const { mutate: mutateConfirmFunded, isPending: isConfirmingFunded } = useMutation({
     mutationFn: (txSig: string) => {
-      if (!jobId) throw new Error('Missing job id.')
+      if (!isValidJobPostPathId(jobId)) throw new Error('Missing job id.')
       return confirmEscrowFunded({ jobPostId: jobId, txSignature: txSig })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['escrow', jobId] }),
@@ -385,7 +384,7 @@ export default function CandidatePipelinePage() {
 
   const { mutate: mutateConfirmReleased, isPending: isConfirmingReleased } = useMutation({
     mutationFn: () => {
-      if (!jobId) throw new Error('Missing job id.')
+      if (!isValidJobPostPathId(jobId)) throw new Error('Missing job id.')
       return confirmEscrowReleased({ jobPostId: jobId })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['escrow', jobId] }),
@@ -393,7 +392,7 @@ export default function CandidatePipelinePage() {
 
   const { mutate: mutateConfirmRefunded, isPending: isConfirmingRefunded } = useMutation({
     mutationFn: () => {
-      if (!jobId) throw new Error('Missing job id.')
+      if (!isValidJobPostPathId(jobId)) throw new Error('Missing job id.')
       return confirmEscrowRefunded({ jobPostId: jobId })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['escrow', jobId] }),
@@ -566,4 +565,17 @@ export default function CandidatePipelinePage() {
       </div>
     </div>
   )
+}
+
+export default function CandidatePipelinePage() {
+  const params = useParams()
+  const rawId = params?.id
+  const jobId =
+    typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : ''
+
+  if (!isValidJobPostPathId(jobId)) {
+    notFound()
+  }
+
+  return <CandidatePipelinePageInner jobId={jobId} />
 }

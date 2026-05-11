@@ -1474,13 +1474,74 @@
         "tags": [
           "Jobs"
         ]
+      },
+      "post": {
+        "description": "Same as POST /jobs/draft. Creates a DRAFT job for the authenticated company.",
+        "operationId": "JobsController_createAtRoot",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new job post (draft)",
+        "tags": [
+          "Jobs"
+        ]
       }
     },
     "/jobs/me": {
       "get": {
         "description": "Returns all job posts owned by the authenticated company, ordered by newest first.\n\nUseful for dashboards and job management views.",
         "operationId": "JobsController_getMyJobs",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter jobs returned for the authenticated company. Omit or use `all` for every status.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "active",
+                "all"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "List of jobs",
@@ -1789,6 +1850,43 @@
           }
         ],
         "summary": "Publish a job",
+        "tags": [
+          "Jobs"
+        ]
+      },
+      "patch": {
+        "description": "Same as POST /jobs/:id/publish.",
+        "operationId": "JobsController_publishPatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Job ID",
+            "schema": {
+              "example": "cma9x1k2p0000qwert123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish a job (PATCH)",
         "tags": [
           "Jobs"
         ]
@@ -4696,6 +4794,25 @@
           "currency": {
             "type": "string",
             "example": "USD"
+          },
+          "roleType": {
+            "type": "string",
+            "enum": [
+              "BACKEND",
+              "FRONTEND",
+              "FULLSTACK",
+              "INFRASTRUCTURE",
+              "DATA_ML",
+              "SMART_CONTRACT",
+              "WEB3_BACKEND",
+              "WEB3_FRONTEND",
+              "WEB3_FULLSTACK",
+              "DEFI_PROTOCOL",
+              "SECURITY_WEB3",
+              "SECURITY",
+              "GENERALIST"
+            ],
+            "description": "Primary role category for this opening."
           }
         },
         "required": [

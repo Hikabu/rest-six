@@ -32,15 +32,29 @@ export class JobsService {
       data.currency = dto.currency;
     }
 
-    if (dto.bonusAmount !== undefined) {
-      data.bonusAmount = dto.bonusAmount;
+    data.bonusAmount = dto.bonusAmount ?? 0;
+
+    if (dto.roleType) {
+      data.roleType = dto.roleType;
     }
 
     return this.prisma.jobPost.create({ data });
   }
-  async findMyJobs(companyId: string) {
+
+  async findMyJobs(
+    companyId: string,
+    status?: 'draft' | 'active' | 'all',
+  ) {
+    const where: { companyId: string; status?: JobStatus } = { companyId };
+
+    if (status === 'draft') {
+      where.status = JobStatus.DRAFT;
+    } else if (status === 'active') {
+      where.status = JobStatus.ACTIVE;
+    }
+
     return this.prisma.jobPost.findMany({
-      where: { companyId },
+      where,
       orderBy: { createdAt: 'desc' },
     });
   }

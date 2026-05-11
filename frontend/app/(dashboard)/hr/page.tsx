@@ -35,7 +35,11 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/empty-state";
 import Link from "next/link";
-import { JobsController_getMyJobs } from "@/lib/api";
+import {
+  JobsController_getMyJobs,
+  normalizeJobStatus,
+  unwrapApiSuccessData,
+} from "@/lib/api";
 
 // Mock getTasks since it doesn't exist in api.ts
 const getTasks = async () => {
@@ -50,9 +54,14 @@ export default function HRDashboardPage() {
     queryFn: () => JobsController_getMyJobs(),
   });
 
-  const jobs = Array.isArray(jobsResponse)
-    ? jobsResponse
-    : (jobsResponse as any)?.data || (jobsResponse as any)?.items || [];
+  const jobsRaw = unwrapApiSuccessData<unknown[]>(jobsResponse);
+  const jobs = Array.isArray(jobsRaw)
+    ? jobsRaw
+    : Array.isArray(jobsResponse)
+      ? jobsResponse
+      : (jobsResponse as { data?: unknown[] })?.data ||
+        (jobsResponse as { items?: unknown[] })?.items ||
+        [];
 
   const isNewCompany = !isLoadingJobs && jobs.length === 0;
 
@@ -61,7 +70,10 @@ export default function HRDashboardPage() {
     queryFn: getTasks,
   });
 
-  const draftCount = jobs.filter((j: any) => j.status === "draft").length;
+  const draftCount = jobs.filter(
+    (j: Record<string, unknown>) =>
+      normalizeJobStatus(j.status) === "draft",
+  ).length;
   const recentJobs = jobs.slice(0, 5);
 
   // Checklist state
@@ -159,7 +171,7 @@ export default function HRDashboardPage() {
             </Card>
           </Link>
 
-          <Link href="/hr/jobs?filter=draft">
+          <Link href="/hr/jobs/draft">
             <Card className="hover:border-violet-500 hover:shadow-md transition-all cursor-pointer h-full group">
               <CardContent className="p-6 flex flex-col items-start gap-4">
                 <div className="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
@@ -274,27 +286,30 @@ export default function HRDashboardPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  recentJobs.map((job: any) => (
-                    <TableRow key={job.id} className="group cursor-default">
+                  recentJobs.map((job: Record<string, unknown>) => {
+                    const st = normalizeJobStatus(job.status);
+                    const jid = String(job.id ?? "");
+                    return (
+                    <TableRow key={jid} className="group cursor-default">
                       <TableCell className="font-medium text-slate-900 dark:text-white">
-                        {job.title}
+                        {String(job.title ?? "")}
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant={
-                            job.status === "draft" ? "secondary" : "default"
+                            st === "draft" ? "secondary" : "default"
                           }
                           className={
-                            job.status === "active"
+                            st === "active"
                               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-100"
-                              : job.status === "paused"
+                              : st === "paused"
                                 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-100"
-                                : job.status === "closed"
+                                : st === "closed"
                                   ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-100"
                                   : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-100"
                           }
                         >
-                          {job.status}
+                          {st || "—"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-slate-600 dark:text-slate-400">
@@ -306,14 +321,15 @@ export default function HRDashboardPage() {
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/hr/jobs/${job.id}`}>
+                        <Link href={`/hr/jobs/${jid}`}>
                           <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                             View
                           </Button>
                         </Link>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

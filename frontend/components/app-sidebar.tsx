@@ -76,7 +76,7 @@ const recruiterNavigation: NavItem[] = [
   },
   {
     title: "Jobs",
-    href: "/jobs",
+    href: "/hr/jobs",
     icon: Briefcase,
     items: [
       { title: "All Jobs", href: "/hr/jobs" },

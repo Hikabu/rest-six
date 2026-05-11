@@ -120,6 +120,35 @@ function getRequestParts(request: unknown): ApiRequestParts {
   return (request ?? {}) as ApiRequestParts;
 }
 
+/**
+ * Use before calling job-scoped APIs (`/jobs/:id`, `/applications/hr/jobs/:jobId`, `/escrow/status/:jobPostId`).
+ * Sidebar links like `/hr/jobs/active` are handled by `[id]` and must not hit the network as IDs.
+ */
+export function isValidJobPostPathId(id: string | undefined | null): id is string {
+  if (id == null || id === "") return false;
+  if (id === "draft" || id === "active") return false;
+  return true;
+}
+
+/** Backend wraps most payloads as `{ success, data }`. */
+export function unwrapApiSuccessData<T>(response: unknown): T {
+  if (
+    response &&
+    typeof response === "object" &&
+    "success" in response &&
+    (response as { success?: boolean }).success === true &&
+    "data" in response
+  ) {
+    return (response as { data: T }).data;
+  }
+  return response as T;
+}
+
+/** Normalize enum job status from the API (e.g. `DRAFT` → `draft`). */
+export function normalizeJobStatus(status: unknown): string {
+  return String(status ?? "").toLowerCase();
+}
+
 function withPathParams(
   path: string,
   params?: Record<string, string | number | boolean>,
@@ -282,46 +311,59 @@ export async function apiFetch<ResponseBody>(
     return body as ResponseBody;
   }
 
-  // TRY REFRESH ON 401
+  // Candidates use cookie refresh; employers use Privy JWT + httpOnly cookie — no /auth/refresh.
   if (response.status === 401) {
+    const role = useAuthStore?.getState?.()?.role;
+
+    if (role !== "candidate") {
+      throw new ApiError(response.status, body);
+    }
+
+    let refreshResponse: Response;
     try {
-      const refreshResponse = await fetch(
-        new URL("/auth/refresh", API_BASE_URL),
+      refreshResponse = await fetch(
+        new URL("/auth/candidate/refresh", API_BASE_URL),
         {
           method: "POST",
           credentials: "include",
         },
       );
-
-      if (!refreshResponse.ok) {
-
-        useAuthStore.getState().clearAuth();
-        throw new ApiError(401, "Unauthorized");
-      }
-
-      const refreshBody = await refreshResponse.json();
-
-      if (refreshBody.accessToken) {
-        useAuthStore.getState().setAuth({
-  token: refreshBody.accessToken,
-});
-      }
-
-      // RETRY ORIGINAL REQUEST
-      ({ response, body } = await executeRequest());
-
-      if (response.ok) {
-        return body as ResponseBody;
-      }
-
-      // STILL UNAUTHORIZED AFTER REFRESH
-      if (response.status === 401) {
-        useAuthStore.getState().clearAuth();
-        throw new ApiError(401, "Unauthorized");
-      }
     } catch {
+      throw new ApiError(401, body);
+    }
+
+    const refreshText = await refreshResponse.text();
+    let refreshBody: { accessToken?: string } = {};
+
+    if (refreshText) {
+      try {
+        refreshBody = JSON.parse(refreshText) as { accessToken?: string };
+      } catch {
+        useAuthStore.getState().clearAuth();
+        throw new ApiError(401, { message: "Invalid refresh response" });
+      }
+    }
+
+    if (!refreshResponse.ok) {
       useAuthStore.getState().clearAuth();
-      throw new ApiError(401, "Unauthorized");
+      throw new ApiError(401, refreshBody ?? body);
+    }
+
+    if (refreshBody.accessToken) {
+      useAuthStore.getState().setAuth({
+        token: refreshBody.accessToken,
+      });
+    }
+
+    ({ response, body } = await executeRequest());
+
+    if (response.ok) {
+      return body as ResponseBody;
+    }
+
+    if (response.status === 401) {
+      useAuthStore.getState().clearAuth();
+      throw new ApiError(401, body);
     }
   }
 
@@ -1365,7 +1407,9 @@ export type JobsController_getMyJobsRequest =
 export type JobsController_getMyJobsResponse =
   ApiResponse<JobsController_getMyJobsOperation>;
 export async function JobsController_getMyJobs(
-  request?: JobsController_getMyJobsRequest,
+  request?: JobsController_getMyJobsRequest & {
+    query?: { status?: "draft" | "active" | "all" };
+  },
 ): Promise<JobsController_getMyJobsResponse> {
   const parts = getRequestParts(request);
   return apiFetch<JobsController_getMyJobsResponse>(
@@ -1391,6 +1435,9 @@ export async function JobsController_getPublicJobById(
   request: JobsController_getPublicJobByIdRequest,
 ): Promise<JobsController_getPublicJobByIdResponse> {
   const parts = getRequestParts(request);
+  if (!isValidJobPostPathId(parts.path?.id as string | undefined)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return apiFetch<JobsController_getPublicJobByIdResponse>(
     withPathParams("/jobs/{id}", parts.path),
     {
@@ -1421,6 +1468,19 @@ export async function JobsController_create(
   );
 }
 
+/** Canonical create endpoint: `POST /jobs` (same payload as `/jobs/draft`). */
+export async function JobsController_createJobPost(
+  request: JobsController_createRequest,
+): Promise<JobsController_createResponse> {
+  const parts = getRequestParts(request);
+  return apiFetch<JobsController_createResponse>("/jobs", {
+    method: "POST",
+    query: parts.query,
+    headers: parts.headers,
+    body: parts.body,
+  });
+}
+
 type JobsController_parseJdOperation = ApiOperation<
   "/jobs/{id}/parse-jd",
   "post"
@@ -1433,6 +1493,9 @@ export async function JobsController_parseJd(
   request: JobsController_parseJdRequest,
 ): Promise<JobsController_parseJdResponse> {
   const parts = getRequestParts(request);
+  if (!isValidJobPostPathId(parts.path?.id as string | undefined)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return apiFetch<JobsController_parseJdResponse>(
     withPathParams("/jobs/{id}/parse-jd", parts.path),
     {
@@ -1456,6 +1519,9 @@ export async function JobsController_confirmRequirements(
   request: JobsController_confirmRequirementsRequest,
 ): Promise<JobsController_confirmRequirementsResponse> {
   const parts = getRequestParts(request);
+  if (!isValidJobPostPathId(parts.path?.id as string | undefined)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return apiFetch<JobsController_confirmRequirementsResponse>(
     withPathParams("/jobs/{id}/confirm-requirements", parts.path),
     {
@@ -1479,10 +1545,31 @@ export async function JobsController_publish(
   request: JobsController_publishRequest,
 ): Promise<JobsController_publishResponse> {
   const parts = getRequestParts(request);
+  if (!isValidJobPostPathId(parts.path?.id as string | undefined)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return apiFetch<JobsController_publishResponse>(
     withPathParams("/jobs/{id}/publish", parts.path),
     {
       method: "POST",
+      query: parts.query,
+      headers: parts.headers,
+      body: parts.body,
+    },
+  );
+}
+
+export async function JobsController_publishPatch(
+  request: JobsController_publishRequest,
+): Promise<JobsController_publishResponse> {
+  const parts = getRequestParts(request);
+  if (!isValidJobPostPathId(parts.path?.id as string | undefined)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
+  return apiFetch<JobsController_publishResponse>(
+    withPathParams("/jobs/{id}/publish", parts.path),
+    {
+      method: "PATCH",
       query: parts.query,
       headers: parts.headers,
       body: parts.body,
@@ -1499,6 +1586,9 @@ export async function JobsController_close(
   request: JobsController_closeRequest,
 ): Promise<JobsController_closeResponse> {
   const parts = getRequestParts(request);
+  if (!isValidJobPostPathId(parts.path?.id as string | undefined)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return apiFetch<JobsController_closeResponse>(
     withPathParams("/jobs/{id}/close", parts.path),
     {
@@ -2562,8 +2652,18 @@ export const listJobs = (params: {
 }): Promise<{ jobs: any[], total: number }> => (JobsController_getPublicJobs as any)({ query: params });
 
 export const getJob = (id: string) => JobsController_getPublicJobById({ path: { id } } as any);
-export const getGapPreview = (params: { jobId: string }) => ApplicantsController_getGapPreview({ query: params } as any);
-export const applyToJob = (jobId: string) => ApplicantsController_apply({ path: { jobId } } as any);
+export const getGapPreview = (params: { jobId: string }) => {
+  if (!isValidJobPostPathId(params.jobId)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
+  return ApplicantsController_getGapPreview({ query: params } as any);
+};
+export const applyToJob = (jobId: string) => {
+  if (!isValidJobPostPathId(jobId)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
+  return ApplicantsController_apply({ path: { jobId } } as any);
+};
 
 export const initiateVouch = async (username: string, data: { message?: string }) => {
   return (ActionsController_getBlinkTransaction as any)({
@@ -2577,22 +2677,37 @@ export const confirmVouch = async (data: { signature: string, txData?: string })
 };
 
 export const confirmEscrowFunded = async (data: { jobPostId: string, txSignature: string }) => {
+  if (!isValidJobPostPathId(data.jobPostId)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return (EscrowController_confirmFunded as any)({ body: data });
 };
 
 export const getEscrowStatus = async (jobPostId: string) => {
+  if (!isValidJobPostPathId(jobPostId)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return (EscrowController_status as any)({ path: { jobPostId } });
 };
 
 export const setEscrowCandidate = async (data: { jobPostId: string, candidateId: string, walletAddress: string }) => {
+  if (!isValidJobPostPathId(data.jobPostId)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return (EscrowController_setCandidate as any)({ body: data });
 };
 
 export const confirmEscrowReleased = async (data: { jobPostId: string }) => {
+  if (!isValidJobPostPathId(data.jobPostId)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return (EscrowController_confirmReleased as any)({ body: data });
 };
 
 export const confirmEscrowRefunded = async (data: { jobPostId: string }) => {
+  if (!isValidJobPostPathId(data.jobPostId)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return (EscrowController_confirmRefunded as any)({ body: data });
 };
 
@@ -2600,6 +2715,9 @@ export const confirmEscrowRefunded = async (data: { jobPostId: string }) => {
 // Pipeline & Application Endpoints
 // ---------------------------------------------------------------------------
 export const getJobApplications = async (jobId: string) => {
+  if (!isValidJobPostPathId(jobId)) {
+    return Promise.reject(new Error("Invalid job id"));
+  }
   return (ApplicantsController_getJobApplications as any)({ path: { jobId } });
 };
 
