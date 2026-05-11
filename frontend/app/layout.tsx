@@ -50,26 +50,11 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function DashboardLayout({
+export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
-  const [commandOpen, setCommandOpen] = React.useState(false)
-
-  // Global keyboard shortcut for command palette
-  React.useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setCommandOpen((open) => !open)
-      }
-    }
-
-    document.addEventListener("keydown", down)
-    return () => document.removeEventListener("keydown", down)
-  }, [])
-
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="en"

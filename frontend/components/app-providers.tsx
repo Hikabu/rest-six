@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
-import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/components/AuthProvider";
