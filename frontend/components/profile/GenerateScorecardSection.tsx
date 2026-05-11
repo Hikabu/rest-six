@@ -231,9 +231,9 @@ export function GenerateScorecardSection({
         <RowSeparator />
 
         {/* ── ROW: Wallet ── */}
-        <div className="flex justify-end mb-3">
+        {/* <div className="flex justify-end mb-3">
   <WalletMultiButton />
-</div>
+</div> */}
         <div className="flex flex-col gap-1 py-3">
           <div className="flex items-center justify-between gap-3">
             {/* Left: icon + label + status chip */}

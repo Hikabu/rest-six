@@ -87,6 +87,12 @@ function AuthPageContent() {
   }, [role, router, token]);
 
   useEffect(() => {
+    if (searchParams.get("clear_session") === "true") {
+      useAuthStore.getState().clearAuth();
+      router.replace("/auth");
+      return;
+    }
+
     const resetToken = searchParams.get("reset_token") ?? searchParams.get("token");
     if (resetToken) {
       setMode("candidate");

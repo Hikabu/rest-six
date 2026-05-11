@@ -46,7 +46,7 @@ export default async function middleware(request: NextRequest) {
 
     if (!isTokenValid) {
       if (!refreshToken) {
-        return NextResponse.redirect(new URL('/', request.url))
+        return NextResponse.redirect(new URL('/auth?clear_session=true', request.url))
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
@@ -60,7 +60,7 @@ export default async function middleware(request: NextRequest) {
       })
 
       if (!refreshRes.ok) {
-        return NextResponse.redirect(new URL('/', request.url))
+        return NextResponse.redirect(new URL('/auth?clear_session=true', request.url))
       }
 
       const setCookies = refreshRes.headers.getSetCookie ? refreshRes.headers.getSetCookie() : []
@@ -75,7 +75,9 @@ export default async function middleware(request: NextRequest) {
 
       try {
         const body = await refreshRes.json()
-        if (body && body.access_token) {
+        if (body && body.data && body.data.accessToken) {
+          payload = decodeJwt(body.data.accessToken)
+        } else if (body && body.access_token) {
           payload = decodeJwt(body.access_token)
         }
       } catch (e) {
@@ -84,23 +86,20 @@ export default async function middleware(request: NextRequest) {
     }
 
     if (!payload || !payload.role) {
-      return NextResponse.redirect(new URL('/', request.url))
+      return NextResponse.redirect(new URL('/auth?clear_session=true', request.url))
     }
 
-    const role = payload.role
+    const role = String(payload.role).toLowerCase()
 
     if (isCandidateRoute) {
       if (role !== 'candidate') {
-        return NextResponse.redirect(new URL('/', request.url))
+        return NextResponse.redirect(new URL('/auth?clear_session=true', request.url))
       }
     }
 
     if (isEmployerRoute) {
-      if (role === 'candidate') {
+      if (!['employer', 'hr', 'hr_admin'].includes(role)) {
         return NextResponse.redirect(new URL('/profile', request.url))
-      }
-      if (role !== 'employer') {
-        return NextResponse.redirect(new URL('/', request.url))
       }
     }
 
@@ -119,6 +118,6 @@ export default async function middleware(request: NextRequest) {
 
     return response
   } catch (error) {
-    return NextResponse.redirect(new URL('/', request.url))
+    return NextResponse.redirect(new URL('/auth?clear_session=true', request.url))
   }
 }
