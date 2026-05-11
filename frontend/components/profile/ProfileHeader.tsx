@@ -81,7 +81,7 @@ function UsernameCopyBadge({ username }: { username: string }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_FRONTEND_URL}/profile/${username}`).then(() => {
+    navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_FRONTEND_URL}/u/${username}`).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     })
@@ -93,7 +93,7 @@ function UsernameCopyBadge({ username }: { username: string }) {
       aria-label="Copy profile path"
       className="group inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors duration-150 hover:border-border/80 hover:bg-muted/70 hover:text-foreground cursor-pointer"
     >
-      <span>{process.env.NEXT_PUBLIC_FRONTEND_URL}/profile/{username}</span>
+      <span>{process.env.NEXT_PUBLIC_FRONTEND_URL}/u/{username}</span>
       <AnimatePresence mode="wait" initial={false}>
         {copied ? (
           <motion.span
@@ -127,11 +127,7 @@ function UsernameCopyBadge({ username }: { username: string }) {
 
 export function ProfileHeader({
   user,
-  candidate,
-  isEditing,
-  onToggleEdit,
-  onSave,
-  isSaving,
+  candidate
 }: ProfileHeaderProps) {
   // Local form state (only used in edit mode)
   const [formName, setFormName] = useState(user.name)
@@ -139,7 +135,24 @@ export function ProfileHeader({
   const [formLocation, setFormLocation] = useState(candidate.location ?? '')
   const [formWebsite, setFormWebsite] = useState(candidate.website ?? '')
   const [publicScorecard, setPublicScorecard] = useState(true)
+   const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
+  const onToggleEdit = () => setIsEditing((v) => !v)
+
+  const onSave = async () => {
+    setIsSaving(true)
+    try {
+      await fetch("/api/profile/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user, candidate }),
+      })
+    } finally {
+      setIsSaving(false)
+      setIsEditing(false)
+    }
+  }
   // Reset form when edit is cancelled
   const handleCancel = () => {
     setFormName(user.name)

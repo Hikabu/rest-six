@@ -37,7 +37,7 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.enableCors({
-    origin: corsOrigins.length > 0 ? corsOrigins : false,
+    origin: corsOrigins.length > 0 ? corsOrigins : ['http://localhost:3001'],
     credentials: true,
   });
 

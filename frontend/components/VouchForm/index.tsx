@@ -6,10 +6,12 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { Transaction } from '@solana/web3.js'
 import bs58 from 'bs58'
 import { useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { initiateVouch, confirmVouch } from '@/lib/api'
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -145,6 +147,11 @@ function Spinner() {
 
 // Step 1: Connect wallet
 function StepConnect({ isLoading }: { isLoading: boolean }) {
+    const [mounted, setMounted] = useState(false)
+
+useEffect(() => {
+  setMounted(true)
+}, [])
   return (
     <StepWrapper stepKey={1}>
       <p className="text-sm text-[#94A3B8]">Connect your wallet to vouch on-chain</p>
@@ -155,19 +162,10 @@ function StepConnect({ isLoading }: { isLoading: boolean }) {
         id="vouch-wallet-connect"
         className="flex justify-center [&_button]:!rounded-xl [&_button]:!bg-[#1A2338] [&_button]:!ring-1 [&_button]:!ring-[#253046] [&_button]:!text-sm [&_button]:!font-medium [&_button]:!text-[#F9FAFB] [&_button:hover]:!bg-[#253046] [&_button]:!h-11 [&_button]:!px-5 [&_button]:!transition-colors [&_button]:!duration-150"
       >
-        {/* The parent page is expected to render <WalletMultiButton /> here.
-            If no wallet adapter UI package is present, we render a placeholder. */}
-        <button
-          className="flex h-11 items-center gap-2 rounded-xl bg-[#1A2338] px-5 text-sm font-medium text-[#F9FAFB] ring-1 ring-[#253046] transition-colors duration-150 hover:bg-[#253046] cursor-pointer"
-          disabled={isLoading}
-        >
-          <svg className="h-4 w-4 text-[#94A3B8]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-            <path d="M16 13a1 1 0 100-2 1 1 0 000 2z" strokeLinecap="round" />
-            <path d="M3 9V7a2 2 0 012-2h14a2 2 0 012 2v2" />
-          </svg>
-          Connect Wallet
-        </button>
+        {/* We render WalletMultiButton natively here so the user can connect seamlessly */}
+        <div className="hidden md:flex items-center gap-2">
+  {mounted && <WalletMultiButton />}
+</div>
       </div>
     </StepWrapper>
   )
@@ -220,6 +218,10 @@ function StepMessage({
       <Button
         id="vouch-submit"
         onClick={onSubmit}
+  //       onClick={() => {
+  //   console.log("🔥 DIRECT HTML BUTTON CLICKED")
+  //   handleVouch()
+  // }}
         disabled={isLoading}
         className="h-11 w-full rounded-xl bg-[#6C5CE7] text-sm font-medium text-white hover:bg-[#7C6CF0] transition-colors disabled:opacity-50 cursor-pointer"
       >
@@ -366,6 +368,7 @@ export function VouchForm({
   const { publicKey, connected, signTransaction } = useWallet()
   const { connection } = useConnection()
   const queryClient = useQueryClient()
+  const router = useRouter()
 
   const [step, setStep] = useState<number>(1)
   const [txSignature, setTxSignature] = useState('')
@@ -389,37 +392,94 @@ export function VouchForm({
   }, [connected, step])
 
   const handleVouch = async () => {
-    try {
-      setError(null)
-      // Step 3 — initiate
-      setStep(3)
-      const { txData } = await initiateVouch(username, { message })
+  console.log("hhhhh");
 
-      // Step 4 — sign
-      setStep(4)
-      const tx = Transaction.from(Buffer.from(txData, 'base64'))
-      if (!signTransaction) {
-        throw new Error('Wallet does not support signing')
-      }
-      const signed = await signTransaction(tx)
+  try {
+    setError(null)
 
-      // Step 5 — broadcast
-      setStep(5)
-      const sig = await connection.sendRawTransaction(signed.serialize())
-      await connection.confirmTransaction(sig)
-      setTxSignature(sig)
+    // Step 3 — initiate
+    setStep(3)
 
-      // Step 6 — confirm on-chain
-      await confirmVouch({ signature: sig, txData })
-      setStep(6)
-      queryClient.invalidateQueries({ queryKey: ['publicScorecard', username] })
-    } catch (err: any) {
-      console.error('Vouch error:', err)
-      setError(err.message || 'An error occurred while vouching')
-      setStep(2) // back to form on error
+    if (!publicKey) {
+      throw new Error("Wallet not connected")
     }
-  }
 
+    const viewerWallet = publicKey.toBase58()
+
+    console.log("━━━━━━━━━━━━━━━━━━━━")
+    console.log("STEP 1 — HANDLE VOUCH")
+    console.log("username:", username)
+    console.log("message:", message)
+    console.log("wallet:", viewerWallet)
+    console.log("━━━━━━━━━━━━━━━━━━━━")
+
+    // 🚨 FIX #1: wrap API call safely
+    let res
+    try {
+      res = await initiateVouch(
+        username,
+        { message },
+        viewerWallet
+      )
+    } catch (apiErr: any) {
+      console.error("initiateVouch failed:", apiErr)
+      throw new Error(
+        apiErr?.message?.message ||
+        apiErr?.message ||
+        "Failed to initiate vouch"
+      )
+    }
+
+    // 🚨 FIX #2: validate response
+    const txData = res?.transaction
+
+    if (!txData) {
+      console.error("Bad response:", res)
+      throw new Error("Backend did not return txData")
+    }
+
+    // Step 4 — sign
+    setStep(4)
+
+    const tx = Transaction.from(
+      Buffer.from(txData, "base64")
+    )
+
+    if (!signTransaction) {
+      throw new Error("Wallet does not support signing")
+    }
+
+    const signed = await signTransaction(tx)
+
+    // Step 5 — broadcast
+    setStep(5)
+
+    const sig = await connection.sendRawTransaction(
+      signed.serialize()
+    )
+
+    await connection.confirmTransaction(sig)
+
+    setTxSignature(sig)
+
+    // Step 6 — confirm on-chain
+    await confirmVouch({ signature: sig, txData })
+
+    setStep(6)
+
+    queryClient.invalidateQueries({
+      queryKey: ["publicScorecard", username],
+    })
+
+    router.refresh()
+  } catch (err: any) {
+    console.error("Vouch error:", err)
+
+    setError(err.message || "An error occurred while vouching")
+
+    setStep(2) // back to form
+  }
+}
   const isLoading = step === 3 || step === 4 || step === 5
 
   return (

@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { AnalysisResult } from '../scoring/types/result.types';
 import { CacheService } from '../scoring/cache/cache.service';
 import { RawScorecard } from './contract/scorecard.schema';
+import { User } from '@privy-io/node/resources/index';
 
 @Injectable()
 export class ScorecardService {
@@ -92,17 +93,15 @@ export class ScorecardService {
   // UI MAPPER (FIXED)
   // ─────────────────────────────────────────────────────────────
 
-  mapToUiModel(raw: RawScorecard | ScorecardResult): ScorecardUiDto {
+  async mapToUiModel(raw: RawScorecard | ScorecardResult, userId?: string): Promise<ScorecardUiDto> {
     const isRaw = (r: any): r is RawScorecard => 'ownership' in r;
 
     // ── Fallback / placeholder UI ─────────────────────────────
     if (!isRaw(raw)) {
       return {
         profile: {
-          username: 'candidate',
+          username: "unknown",
           avatarUrl: undefined,
-          primaryCohort: 'unknown',
-          seniority: 'MID' as any,
           summary: 'Reviewing developer history...',
         },
         score: {
@@ -143,18 +142,36 @@ export class ScorecardService {
 
     const real = raw;
 
+    
+
     const capabilities = [
       this.mapCapability('backend', real.capabilities.backend),
       this.mapCapability('frontend', real.capabilities.frontend),
       this.mapCapability('devops', real.capabilities.devops),
     ];
 
+      const user = await this.prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      githubProfile: {
+        select: {
+          githubUsername: true,
+          rawDataSnapshot: true,
+        },
+      },
+    },
+  });
+
+  const githubUsername = user?.githubProfile?.githubUsername;
+
     return {
       profile: {
-        username: 'unknown',
-        avatarUrl: undefined,
-        primaryCohort: 'unknown',
-        seniority: 'MID' as any,
+        username: user?.username ?? githubUsername ?? "unknown",
+    avatarUrl:githubUsername
+        ? `https://github.com/${githubUsername}.png`
+        : undefined,
         summary: real.summary,
       },
       score: {

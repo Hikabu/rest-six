@@ -250,6 +250,7 @@ This system measures **soft skills and credibility** through **peer reviews ("vo
 3. Enter message
 4. Submit vouch
 
+
 ```
 POST /api/actions/vouch/{username}?message=...
 ```
