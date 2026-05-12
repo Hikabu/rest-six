@@ -134,54 +134,63 @@ export default function BrowseClient() {
   const initialTab = searchParams.get("tab") === "people" ? "people" : "jobs";
   const [tab, setTab] = useState(initialTab);
 
-  // ── Jobs state ────────────────────────────────────────────────────────────
-  const [filters, setFilters] = useState<FilterState>({});
-  const debouncedFilters = useDebounce(filters, 300);
-  const [page, setPage] = useState(1);
-  const [allJobs, setAllJobs] = useState<Job[]>([]);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+ // ── Jobs state ────────────────────────────────────────────────────────────
+const [filters, setFilters] = useState<FilterState>({});
+const debouncedFilters = useDebounce(filters, 300);
 
-  const {
-    data: jobsData,
-    isLoading: jobsLoading,
-    isFetching: jobsFetching,
-  } = useQuery({
-    queryKey: ["jobs", debouncedFilters, page],
-    queryFn: () => listJobs({ ...debouncedFilters, page, limit: 12 }),
+const [page, setPage] = useState(1);
+const [allJobs, setAllJobs] = useState<Job[]>([]);
+const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+// API call
+const {
+  data: jobsData,
+  isLoading: jobsLoading,
+  isFetching: jobsFetching,
+} = useQuery({
+  queryKey: ["jobs", debouncedFilters, page],
+  queryFn: async () => {
+    const res = await listJobs({
+      ...debouncedFilters,
+      page,
+      limit: 12,
+    });
+
+    return res.data; // { jobs, total }
+  },
+});
+
+const { data: jobDetailData } = useQuery({
+  queryKey: ["job", selectedJobId],
+  queryFn: () => getJob(selectedJobId!),
+  enabled: !!selectedJobId,
+});
+
+const jobDetail = jobDetailData as any;
+
+// reset pagination when filters change
+useEffect(() => {
+  setPage(1);
+  setAllJobs([]);
+}, [debouncedFilters]);
+
+// merge paginated results
+useEffect(() => {
+  if (!jobsData?.jobs) return;
+
+  setAllJobs((prev) => {
+    if (page === 1) return jobsData.jobs;
+
+    const existingIds = new Set(prev.map((j) => j.id));
+    const newJobs = jobsData.jobs.filter((j: Job) => !existingIds.has(j.id));
+
+    return [...prev, ...newJobs];
   });
+}, [jobsData, page]);
 
-  const jobsTotal = jobsData?.total ?? 0;
-  const hasMoreJobs = allJobs.length < jobsTotal;
-
-  const { data: jobDetailData } = useQuery({
-    queryKey: ["job", selectedJobId],
-    queryFn: () => getJob(selectedJobId!),
-    enabled: !!selectedJobId,
-  });
-  
-  const jobDetail = jobDetailData as any;
-
-  useEffect(() => {
-    if (debouncedFilters) {
-      setPage(1);
-      setAllJobs([]);
-    }
-  }, [debouncedFilters]);
-
-  useEffect(() => {
-    if (jobsData?.jobs) {
-      if (page === 1) {
-        setAllJobs(jobsData.jobs);
-      } else {
-        setAllJobs((prev) => {
-          const existingIds = new Set(prev.map((j) => j.id));
-          const newJobs = jobsData.jobs.filter((j: any) => !existingIds.has(j.id));
-          return [...prev, ...newJobs];
-        });
-      }
-    }
-  }, [jobsData, page]);
-
+// pagination meta
+const jobsTotal = jobsData?.total ?? 0;
+const hasMoreJobs = allJobs.length < jobsTotal;
   // ── Talent state ──────────────────────────────────────────────────────────
   const [talentSearch, setTalentSearch] = useState("");
   const debouncedTalentSearch = useDebounce(talentSearch, 300);
@@ -220,7 +229,7 @@ export default function BrowseClient() {
             Find your next role
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Browse open roles and talent on Colosseum
+            Explore opportunities or discover candidates to vouch for.
           </p>
         </div>
       </div>
